@@ -51,7 +51,7 @@ const ticketSchema = new mongoose.Schema({
 
 // Compound index for efficient lookups
 ticketSchema.index({ eventId: 1, userId: 1 }, { unique: true });
-ticketSchema.index({ ticketId: 1 });
+// ticketSchema.index({ ticketId: 1 });
 ticketSchema.index({ status: 1 });
 
 /**

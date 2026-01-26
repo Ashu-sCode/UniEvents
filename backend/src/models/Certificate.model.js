@@ -44,7 +44,7 @@ const certificateSchema = new mongoose.Schema({
 
 // Compound index - one certificate per user per event
 certificateSchema.index({ eventId: 1, userId: 1 }, { unique: true });
-certificateSchema.index({ certificateId: 1 });
+// certificateSchema.index({ certificateId: 1 });
 certificateSchema.index({ userId: 1 });
 
 const Certificate = mongoose.model('Certificate', certificateSchema);
