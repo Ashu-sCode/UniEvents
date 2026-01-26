@@ -63,22 +63,22 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-neutral-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <Ticket className="h-8 w-8 text-primary-600" />
-              <span className="text-xl font-bold text-gray-900">UniEvent</span>
+            <div className="flex items-center space-x-2.5">
+              <Ticket className="h-7 w-7 text-neutral-700" />
+              <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                Welcome, <strong>{user?.name}</strong>
+              <span className="text-sm text-neutral-600">
+                <strong className="text-neutral-900">{user?.name}</strong>
               </span>
               <button
                 onClick={logout}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
                 Logout
@@ -88,47 +88,44 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
           <StatCard
-            icon={<Calendar className="h-6 w-6" />}
+            icon={<Calendar className="h-5 w-5" />}
             label="Upcoming Events"
             value={events.length}
-            color="blue"
           />
           <StatCard
-            icon={<Ticket className="h-6 w-6" />}
+            icon={<Ticket className="h-5 w-5" />}
             label="My Tickets"
             value={tickets.length}
-            color="green"
           />
           <StatCard
-            icon={<Award className="h-6 w-6" />}
+            icon={<Award className="h-5 w-5" />}
             label="Certificates"
             value={0}
-            color="purple"
           />
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-4 mb-6">
+        <div className="flex space-x-3 mb-8">
           <button
             onClick={() => setActiveTab('events')}
-            className={`px-4 py-2 rounded-lg font-medium ${
+            className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
               activeTab === 'events'
-                ? 'bg-primary-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
             }`}
           >
             Browse Events
           </button>
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`px-4 py-2 rounded-lg font-medium ${
+            className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
               activeTab === 'tickets'
-                ? 'bg-primary-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
             }`}
           >
             My Tickets
@@ -137,9 +134,9 @@ export default function StudentDashboard() {
 
         {/* Content */}
         {isLoading ? (
-          <div className="text-center py-12">Loading...</div>
+          <div className="text-center py-16 text-neutral-500">Loading...</div>
         ) : activeTab === 'events' ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {events.map((event) => (
               <EventCard
                 key={event._id}
@@ -149,7 +146,7 @@ export default function StudentDashboard() {
               />
             ))}
             {events.length === 0 && (
-              <p className="text-gray-500 col-span-3 text-center py-12">
+              <p className="text-neutral-500 col-span-3 text-center py-16">
                 No upcoming events available.
               </p>
             )}
@@ -164,7 +161,7 @@ export default function StudentDashboard() {
               />
             ))}
             {tickets.length === 0 && (
-              <p className="text-gray-500 text-center py-12">
+              <p className="text-neutral-500 text-center py-16">
                 You haven't registered for any events yet.
               </p>
             )}
@@ -175,21 +172,15 @@ export default function StudentDashboard() {
   );
 }
 
-function StatCard({ icon, label, value, color }: any) {
-  const colors = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    purple: 'bg-purple-100 text-purple-600',
-  };
-
+function StatCard({ icon, label, value }: any) {
   return (
-    <div className="card flex items-center gap-4">
-      <div className={`p-3 rounded-lg ${colors[color as keyof typeof colors]}`}>
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6 flex items-center gap-4">
+      <div className="p-3 rounded-xl bg-neutral-100 text-neutral-700">
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        <p className="text-sm text-gray-600">{label}</p>
+        <p className="text-2xl font-semibold text-neutral-900">{value}</p>
+        <p className="text-sm text-neutral-600">{label}</p>
       </div>
     </div>
   );
@@ -197,25 +188,25 @@ function StatCard({ icon, label, value, color }: any) {
 
 function EventCard({ event, isRegistered, onRegister }: any) {
   return (
-    <div className="card">
-      <h3 className="font-semibold text-lg text-gray-900 mb-2">{event.title}</h3>
-      <p className="text-sm text-gray-600 mb-4 line-clamp-2">{event.description}</p>
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6 hover:border-neutral-200 transition-all">
+      <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
+      <p className="text-sm text-neutral-600 mb-4 line-clamp-2 leading-relaxed">{event.description}</p>
       
-      <div className="space-y-2 text-sm text-gray-600 mb-4">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
+      <div className="space-y-2.5 text-sm text-neutral-600 mb-5">
+        <div className="flex items-center gap-2.5">
+          <Calendar className="h-4 w-4 text-neutral-400" />
           {formatDate(event.date, { weekday: undefined })}
         </div>
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4" />
+        <div className="flex items-center gap-2.5">
+          <Clock className="h-4 w-4 text-neutral-400" />
           {event.time}
         </div>
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
+        <div className="flex items-center gap-2.5">
+          <MapPin className="h-4 w-4 text-neutral-400" />
           {event.venue}
         </div>
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4" />
+        <div className="flex items-center gap-2.5">
+          <Users className="h-4 w-4 text-neutral-400" />
           {event.seatsAvailable} seats available
         </div>
       </div>
@@ -229,7 +220,7 @@ function EventCard({ event, isRegistered, onRegister }: any) {
           Register Now
         </button>
       ) : (
-        <button disabled className="btn-secondary w-full">
+        <button disabled className="btn-secondary w-full opacity-60">
           Sold Out
         </button>
       )}
@@ -241,15 +232,15 @@ function TicketCard({ ticket, onDownload }: any) {
   const event = ticket.eventId;
 
   return (
-    <div className="card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
-        <h3 className="font-semibold text-lg text-gray-900">{event?.title || 'Event'}</h3>
-        <p className="text-sm text-gray-600">
+        <h3 className="font-semibold text-lg text-neutral-900">{event?.title || 'Event'}</h3>
+        <p className="text-sm text-neutral-600 mt-1">
           {event?.date && formatDate(event.date)} at {event?.time}
         </p>
-        <p className="text-sm text-gray-600">{event?.venue}</p>
-        <div className="mt-2">
-          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
+        <p className="text-sm text-neutral-600">{event?.venue}</p>
+        <div className="mt-3">
+          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
             {ticket.status.toUpperCase()}
           </span>
         </div>

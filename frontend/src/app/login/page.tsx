@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Ticket, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Ticket, Eye, EyeOff } from 'lucide-react';
+import { Button, Card } from '@/components/ui';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -28,22 +29,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-neutral-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <Ticket className="h-10 w-10 text-primary-600" />
-            <span className="text-2xl font-bold text-gray-900">UniEvent</span>
+        <div className="text-center mb-10">
+          <Link href="/" className="inline-flex items-center space-x-2.5 group">
+            <Ticket className="h-9 w-9 text-neutral-700 group-hover:text-neutral-900 transition-colors" />
+            <span className="text-2xl font-semibold text-neutral-900">UniEvent</span>
           </Link>
-          <p className="mt-2 text-gray-600">Welcome back! Sign in to continue.</p>
+          <p className="mt-3 text-neutral-600">Welcome back</p>
         </div>
 
         {/* Login Form */}
-        <div className="card">
+        <Card>
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+              <div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm border border-red-100">
                 {error}
               </div>
             )}
@@ -80,36 +81,29 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={isLoading}
-              className="btn-primary w-full"
+              isLoading={isLoading}
+              className="w-full mt-6"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                'Sign In'
-              )}
-            </button>
+              {isLoading ? 'Signing in...' : 'Sign In'}
+            </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-600">
+          <div className="mt-6 text-center text-sm text-neutral-600">
             Don't have an account?{' '}
-            <Link href="/signup" className="text-primary-600 hover:text-primary-700 font-medium">
+            <Link href="/signup" className="text-neutral-900 hover:text-neutral-700 font-medium transition-colors">
               Sign up
             </Link>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

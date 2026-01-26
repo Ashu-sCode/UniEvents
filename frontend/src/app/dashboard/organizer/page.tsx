@@ -35,25 +35,25 @@ export default function OrganizerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-neutral-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <Ticket className="h-8 w-8 text-primary-600" />
-              <span className="text-xl font-bold text-gray-900">UniEvent</span>
-              <span className="text-sm bg-primary-100 text-primary-700 px-2 py-1 rounded">
+            <div className="flex items-center space-x-2.5">
+              <Ticket className="h-7 w-7 text-neutral-700" />
+              <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
+              <span className="text-sm bg-neutral-100 text-neutral-700 px-2.5 py-1 rounded-lg font-medium">
                 Organizer
               </span>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                {user?.name} • {user?.department}
+              <span className="text-sm text-neutral-600">
+                <strong className="text-neutral-900">{user?.name}</strong> • {user?.department}
               </span>
               <button
                 onClick={logout}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
                 Logout
@@ -63,37 +63,33 @@ export default function OrganizerDashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-10">
           <StatCard
-            icon={<Calendar className="h-6 w-6" />}
+            icon={<Calendar className="h-5 w-5" />}
             label="Total Events"
             value={events.length}
-            color="blue"
           />
           <StatCard
-            icon={<Users className="h-6 w-6" />}
+            icon={<Users className="h-5 w-5" />}
             label="Total Registrations"
             value={events.reduce((sum, e) => sum + e.registeredCount, 0)}
-            color="green"
           />
           <StatCard
-            icon={<Ticket className="h-6 w-6" />}
+            icon={<Ticket className="h-5 w-5" />}
             label="Published"
             value={events.filter(e => e.status === 'published').length}
-            color="purple"
           />
           <StatCard
-            icon={<BarChart3 className="h-6 w-6" />}
+            icon={<BarChart3 className="h-5 w-5" />}
             label="Completed"
             value={events.filter(e => e.status === 'completed').length}
-            color="orange"
           />
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-8">
           <h2 className="page-title">My Events</h2>
           <button
             onClick={() => setShowCreateModal(true)}
@@ -106,7 +102,7 @@ export default function OrganizerDashboard() {
 
         {/* Events List */}
         {isLoading ? (
-          <div className="text-center py-12">Loading...</div>
+          <div className="text-center py-16 text-neutral-500">Loading...</div>
         ) : (
           <div className="space-y-4">
             {events.map((event) => (
@@ -121,8 +117,8 @@ export default function OrganizerDashboard() {
               />
             ))}
             {events.length === 0 && (
-              <div className="card text-center py-12">
-                <p className="text-gray-500 mb-4">You haven't created any events yet.</p>
+              <div className="bg-white rounded-2xl border border-neutral-100 p-12 text-center">
+                <p className="text-neutral-500 mb-4">You haven't created any events yet.</p>
                 <button
                   onClick={() => setShowCreateModal(true)}
                   className="btn-primary"
@@ -157,22 +153,15 @@ export default function OrganizerDashboard() {
   );
 }
 
-function StatCard({ icon, label, value, color }: any) {
-  const colors: Record<string, string> = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    purple: 'bg-purple-100 text-purple-600',
-    orange: 'bg-orange-100 text-orange-600',
-  };
-
+function StatCard({ icon, label, value }: any) {
   return (
-    <div className="card flex items-center gap-4">
-      <div className={`p-3 rounded-lg ${colors[color]}`}>
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6 flex items-center gap-4">
+      <div className="p-3 rounded-xl bg-neutral-100 text-neutral-700">
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        <p className="text-sm text-gray-600">{label}</p>
+        <p className="text-2xl font-semibold text-neutral-900">{value}</p>
+        <p className="text-sm text-neutral-600">{label}</p>
       </div>
     </div>
   );
@@ -189,22 +178,22 @@ function EventRow({ event, onScan, onRefresh }: any) {
   };
 
   return (
-    <div className="card">
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6">
       <div className="flex flex-col lg:flex-row justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="font-semibold text-lg text-gray-900">{event.title}</h3>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(event.status)}`}>
+            <h3 className="font-semibold text-lg text-neutral-900">{event.title}</h3>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(event.status)}`}>
               {event.status.toUpperCase()}
             </span>
-            <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700">
               {event.eventType}
             </span>
           </div>
-          <p className="text-sm text-gray-600 mb-2">
+          <p className="text-sm text-neutral-600 mb-2">
             {formatDate(event.date)} at {event.time} • {event.venue}
           </p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-neutral-600">
             <strong>{event.registeredCount}</strong> / {event.seatLimit} registered
           </p>
         </div>
