@@ -7,9 +7,10 @@ import { formatDate, getStatusColor } from '@/lib/utils';
 import { 
   Calendar, Ticket, Users, LogOut, Plus, 
   QrCode, CheckCircle, XCircle, AlertCircle,
-  BarChart3, Eye
+  BarChart3, Eye, Camera, Keyboard
 } from 'lucide-react';
 import type { Event } from '@/types';
+import CameraScan from '@/components/CameraScan';
 
 export default function OrganizerDashboard() {
   const { user, logout } = useAuth();
@@ -381,19 +382,21 @@ function CreateEventModal({ onClose, onSuccess }: any) {
 }
 
 function QRScanModal({ event, onClose }: any) {
+  const [mode, setMode] = useState<'choose' | 'camera' | 'manual'>('choose');
   const [ticketId, setTicketId] = useState('');
   const [result, setResult] = useState<any>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
-  const handleVerify = async () => {
-    if (!ticketId.trim()) return;
+  const handleVerify = async (id: string) => {
+    const cleanId = id.trim();
+    if (!cleanId) return;
     
     setIsVerifying(true);
     setResult(null);
 
     try {
       const response = await ticketsAPI.verify({
-        ticketId: ticketId.trim(),
+        ticketId: cleanId,
         eventId: event._id,
       });
       setResult({ success: true, data: response.data });
@@ -409,6 +412,21 @@ function QRScanModal({ event, onClose }: any) {
     }
   };
 
+  const handleScanResult = (scannedId: string) => {
+    setMode('choose');
+    handleVerify(scannedId);
+  };
+
+  // Show Camera Scanner
+  if (mode === 'camera') {
+    return (
+      <CameraScan
+        onScan={handleScanResult}
+        onClose={() => setMode('choose')}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-md w-full">
@@ -420,62 +438,97 @@ function QRScanModal({ event, onClose }: any) {
             </button>
           </div>
           
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-gray-600 mb-6">
             Event: <strong>{event.title}</strong>
           </p>
 
-          <div className="mb-4">
-            <label className="label">Enter Ticket ID</label>
-            <input
-              type="text"
-              value={ticketId}
-              onChange={(e) => setTicketId(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
-              className="input font-mono"
-              placeholder="TKT-XXXXXXXX"
-              autoFocus
-            />
-          </div>
-
-          <button
-            onClick={handleVerify}
-            disabled={isVerifying || !ticketId.trim()}
-            className="btn-primary w-full mb-4"
-          >
-            {isVerifying ? 'Verifying...' : 'Verify Ticket'}
-          </button>
-
-          {/* Result */}
-          {result && (
-            <div className={`p-4 rounded-lg ${result.success ? 'bg-green-50' : 'bg-red-50'}`}>
-              {result.success ? (
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-green-800">Entry Verified!</p>
-                    <p className="text-sm text-green-700">
-                      {result.data.verification.attendee.name}
-                    </p>
-                    <p className="text-sm text-green-700">
-                      {result.data.verification.attendee.rollNumber} • {result.data.verification.attendee.department}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3">
-                  <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-red-800">Verification Failed</p>
-                    <p className="text-sm text-red-700">{result.message}</p>
-                  </div>
-                </div>
-              )}
+          {/* Mode Selection */}
+          {mode === 'choose' && !result && (
+            <div className="space-y-3 mb-4">
+              <button
+                onClick={() => setMode('camera')}
+                className="w-full flex items-center justify-center gap-3 p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors"
+              >
+                <Camera className="w-5 h-5" />
+                <span className="font-medium">Scan QR Code</span>
+              </button>
+              
+              <button
+                onClick={() => setMode('manual')}
+                className="w-full flex items-center justify-center gap-3 p-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                <Keyboard className="w-5 h-5" />
+                <span className="font-medium">Enter Ticket ID Manually</span>
+              </button>
             </div>
           )}
 
-          <p className="text-xs text-gray-500 mt-4 text-center">
-            Tip: Use a QR scanner to quickly input ticket IDs
-          </p>
+          {/* Manual Entry Mode */}
+          {mode === 'manual' && (
+            <div className="mb-4">
+              <label className="label">Enter Ticket ID</label>
+              <input
+                type="text"
+                value={ticketId}
+                onChange={(e) => setTicketId(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerify(ticketId)}
+                className="input font-mono mb-3"
+                placeholder="TKT-XXXXXXXX"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMode('choose')}
+                  className="btn-secondary flex-1"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => handleVerify(ticketId)}
+                  disabled={isVerifying || !ticketId.trim()}
+                  className="btn-primary flex-1"
+                >
+                  {isVerifying ? 'Verifying...' : 'Verify'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Result */}
+          {result && (
+            <div className="mb-4">
+              <div className={`p-4 rounded-lg ${result.success ? 'bg-green-50' : 'bg-red-50'}`}>
+                {result.success ? (
+                  <div className="flex items-start gap-3">
+                    <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-green-800">Entry Verified!</p>
+                      <p className="text-sm text-green-700">
+                        {result.data.verification.attendee.name}
+                      </p>
+                      <p className="text-sm text-green-700">
+                        {result.data.verification.attendee.rollNumber} • {result.data.verification.attendee.department}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-red-800">Verification Failed</p>
+                      <p className="text-sm text-red-700">{result.message}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setResult(null)}
+                className="btn-primary w-full mt-3"
+              >
+                Scan Another Ticket
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
