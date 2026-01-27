@@ -33,10 +33,13 @@ const { generateQRCodeBuffer } = require('./qrGenerator');
 const generateTicketPDF = async (ticket) => {
   return new Promise(async (resolve, reject) => {
     try {
-      // A6 size in points (72 points = 1 inch)
+      // Compact ticket size - fits on single page guaranteed
+      // Width: 280pt (~99mm), Height: 400pt (~141mm)
       const doc = new PDFDocument({
-        size: [297, 420], // A6 size in points
-        margin: 20
+        size: [280, 400],
+        margin: 0,
+        bufferPages: true,
+        autoFirstPage: true,
       });
 
       const chunks = [];
@@ -46,98 +49,149 @@ const generateTicketPDF = async (ticket) => {
 
       const event = ticket.eventId;
       const user = ticket.userId;
+      const width = 280;
 
-      // Colors
-      const primaryColor = '#1a365d';
-      const accentColor = '#2563eb';
+      // Colors - modern neutral palette
+      const headerBg = '#1f2937';
+      const textPrimary = '#111827';
+      const textSecondary = '#6b7280';
+      const dividerColor = '#e5e7eb';
+      const accentColor = '#374151';
 
-      // Header
-      doc.fillColor(primaryColor)
-         .fontSize(18)
-         .font('Helvetica-Bold')
-         .text('UNIEVENT', { align: 'center' });
+      // === HEADER SECTION (dark background) ===
+      doc.rect(0, 0, width, 70)
+         .fill(headerBg);
 
-      doc.fontSize(10)
-         .fillColor('#666666')
+      // UniEvent Logo/Brand
+      doc.fillColor('#9ca3af')
+         .fontSize(9)
          .font('Helvetica')
-         .text('University Event Pass', { align: 'center' });
+         .text('UNIEVENT', 0, 15, { width, align: 'center' });
 
-      // Divider
-      doc.moveTo(20, 70)
-         .lineTo(277, 70)
-         .strokeColor('#e5e7eb')
-         .stroke();
-
-      // Event Details
-      doc.moveDown(0.5);
-      doc.fillColor(primaryColor)
-         .fontSize(14)
+      // Event Title
+      doc.fillColor('#ffffff')
+         .fontSize(13)
          .font('Helvetica-Bold')
-         .text(event.title, { align: 'center' });
+         .text(event.title, 15, 32, { 
+           width: width - 30, 
+           align: 'center',
+           lineGap: 2,
+           height: 32,
+           ellipsis: true
+         });
 
-      doc.moveDown(0.5);
-      doc.fillColor('#374151')
-         .fontSize(10)
-         .font('Helvetica');
+      // === EVENT DETAILS SECTION ===
+      let yPos = 80;
 
-      // Format date
+      // Format date compactly
       const eventDate = new Date(event.date);
       const dateStr = eventDate.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       });
 
-      doc.text(`Date: ${dateStr}`, { align: 'center' });
-      doc.text(`Time: ${event.time}`, { align: 'center' });
-      doc.text(`Venue: ${event.venue}`, { align: 'center' });
-
-      // Divider
-      doc.moveTo(20, 170)
-         .lineTo(277, 170)
-         .stroke();
-
-      // Attendee Details
-      doc.moveDown(0.5);
-      doc.fillColor(primaryColor)
-         .fontSize(11)
-         .font('Helvetica-Bold')
-         .text('ATTENDEE DETAILS', { align: 'center' });
-
-      doc.moveDown(0.3);
-      doc.fillColor('#374151')
-         .fontSize(10)
+      // Date & Time row
+      doc.fillColor(textSecondary)
+         .fontSize(7)
          .font('Helvetica')
-         .text(`Name: ${user.name}`, { align: 'center' });
-      
-      if (user.rollNumber) {
-        doc.text(`Roll No: ${user.rollNumber}`, { align: 'center' });
-      }
-      
-      doc.text(`Department: ${user.department}`, { align: 'center' });
+         .text('DATE', 20, yPos);
+      doc.text('TIME', width / 2 + 10, yPos);
 
-      // Divider
-      doc.moveTo(20, 250)
-         .lineTo(277, 250)
-         .stroke();
+      doc.fillColor(textPrimary)
+         .fontSize(9)
+         .font('Helvetica-Bold')
+         .text(dateStr, 20, yPos + 10, { width: width / 2 - 30 });
+      doc.text(event.time, width / 2 + 10, yPos + 10);
+
+      yPos += 32;
+
+      // Venue
+      doc.fillColor(textSecondary)
+         .fontSize(7)
+         .font('Helvetica')
+         .text('VENUE', 20, yPos);
+
+      doc.fillColor(textPrimary)
+         .fontSize(9)
+         .font('Helvetica-Bold')
+         .text(event.venue, 20, yPos + 10, { width: width - 40 });
+
+      yPos += 35;
+
+      // === DIVIDER (dashed line with notches) ===
+      // Draw notches
+      doc.circle(-5, yPos, 8).fill('#f7f7f8');
+      doc.circle(width + 5, yPos, 8).fill('#f7f7f8');
+      
+      // Dashed line
+      doc.strokeColor(dividerColor)
+         .lineWidth(1)
+         .dash(4, { space: 3 })
+         .moveTo(15, yPos)
+         .lineTo(width - 15, yPos)
+         .stroke()
+         .undash();
+
+      yPos += 15;
+
+      // === ATTENDEE SECTION ===
+      doc.fillColor(textSecondary)
+         .fontSize(7)
+         .font('Helvetica')
+         .text('ATTENDEE', 20, yPos);
+
+      doc.fillColor(textPrimary)
+         .fontSize(10)
+         .font('Helvetica-Bold')
+         .text(user.name, 20, yPos + 10);
+
+      yPos += 28;
+
+      // Roll Number & Department on same line
+      if (user.rollNumber) {
+        doc.fillColor(textSecondary)
+           .fontSize(8)
+           .font('Helvetica')
+           .text(`${user.rollNumber}  •  ${user.department}`, 20, yPos);
+      } else {
+        doc.fillColor(textSecondary)
+           .fontSize(8)
+           .font('Helvetica')
+           .text(user.department, 20, yPos);
+      }
+
+      yPos += 20;
+
+      // === QR CODE SECTION ===
+      const qrSize = 110;
+      const qrX = (width - qrSize) / 2;
+      const qrY = yPos + 5;
+
+      // QR background box
+      doc.roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 8)
+         .fillColor('#ffffff')
+         .strokeColor(dividerColor)
+         .fillAndStroke();
 
       // QR Code
       const qrBuffer = await generateQRCodeBuffer(ticket.ticketId);
-      doc.image(qrBuffer, 98, 260, { width: 100, height: 100 });
+      doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+
+      yPos = qrY + qrSize + 20;
 
       // Ticket ID
       doc.fillColor(accentColor)
-         .fontSize(9)
+         .fontSize(8)
          .font('Helvetica-Bold')
-         .text(`Ticket ID: ${ticket.ticketId}`, 20, 370, { align: 'center' });
+         .text(ticket.ticketId, 0, yPos, { width, align: 'center' });
 
-      // Footer
-      doc.fillColor('#9ca3af')
+      // Footer note
+      doc.fillColor(textSecondary)
          .fontSize(7)
          .font('Helvetica')
-         .text('Please present this ticket at the venue entrance', 20, 390, { align: 'center' });
-      doc.text('Single use only • Non-transferable', { align: 'center' });
+         .text('Show this ticket at entry', 0, yPos + 15, { width, align: 'center' });
 
       doc.end();
     } catch (error) {

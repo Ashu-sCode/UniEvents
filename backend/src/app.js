@@ -1,50 +1,89 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
 
-const authRoutes = require('./routes/auth.routes');
-const eventRoutes = require('./routes/event.routes');
-const ticketRoutes = require('./routes/ticket.routes');
-const attendanceRoutes = require('./routes/attendance.routes');
-const certificateRoutes = require('./routes/certificate.routes');
+const authRoutes = require("./routes/auth.routes");
+const eventRoutes = require("./routes/event.routes");
+const ticketRoutes = require("./routes/ticket.routes");
+const attendanceRoutes = require("./routes/attendance.routes");
+const certificateRoutes = require("./routes/certificate.routes");
 
-const errorHandler = require('./middleware/errorHandler');
+const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
-/* ---------- CORS ---------- */
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
-
-app.use(cors({
-  origin: allowedOrigin,
-  credentials: true
-}));
-
+/* =========================
+   CORS - Allow All Origins
+========================= */
+// Handle preflight requests for all routes
 app.options('*', cors());
 
-/* ---------- BODY PARSERS ---------- */
+// Apply CORS to all requests
+app.use(cors({
+  origin: true, // Reflect the request origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: true,
+  maxAge: 86400 // Cache preflight for 24 hours
+}));
+
+// Additional headers for extra compatibility
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+/* =========================
+   BODY PARSERS
+========================= */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ---------- STATIC ---------- */
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+/* =========================
+   STATIC FILES
+========================= */
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-/* ---------- ROUTES ---------- */
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'UniEvent API is running' });
+/* =========================
+   HEALTH CHECK
+========================= */
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "UniEvent API is running"
+  });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/tickets', ticketRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/certificates', certificateRoutes);
+/* =========================
+   ROUTES
+========================= */
+app.use("/api/auth", authRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/tickets", ticketRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/certificates", certificateRoutes);
 
-/* ---------- ERRORS ---------- */
+/* =========================
+   404 HANDLER
+========================= */
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' });
+  res.status(404).json({
+    success: false,
+    message: "Route not found"
+  });
 });
 
+/* =========================
+   GLOBAL ERROR HANDLER
+========================= */
 app.use(errorHandler);
 
 module.exports = app;
