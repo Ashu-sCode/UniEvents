@@ -310,10 +310,53 @@ const downloadTicketPDF = async (req, res, next) => {
   }
 };
 
+/**
+ * @route   GET /api/tickets/:ticketId/preview
+ * @desc    Preview ticket as PDF (inline for iframe viewing)
+ * @access  Private
+ */
+const previewTicketPDF = async (req, res, next) => {
+  try {
+    const ticket = await Ticket.findOne({ ticketId: req.params.ticketId })
+      .populate('eventId')
+      .populate('userId', 'name rollNumber department');
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    // Only ticket owner can preview
+    if (ticket.userId._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view this ticket'
+      });
+    }
+
+    // Generate PDF
+    const pdfBuffer = await generateTicketPDF(ticket);
+
+    // Set response headers for inline PDF viewing
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename=ticket-${ticket.ticketId}.pdf`,
+      'Content-Length': pdfBuffer.length
+    });
+
+    res.send(pdfBuffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerForEvent,
   getMyTickets,
   getTicketById,
   verifyTicket,
-  downloadTicketPDF
+  downloadTicketPDF,
+  previewTicketPDF
 };

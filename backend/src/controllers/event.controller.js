@@ -6,6 +6,8 @@
 const Event = require('../models/Event.model');
 const Ticket = require('../models/Ticket.model');
 const { roles } = require('../config/auth.config');
+const certificateService = require('../services/certificateService');
+const imageService = require('../services/imageService');
 
 /**
  * @route   POST /api/events
@@ -26,6 +28,7 @@ const createEvent = async (req, res, next) => {
       enableCertificates
     } = req.body;
 
+    // Create event first
     const event = await Event.create({
       title,
       description,
@@ -36,8 +39,24 @@ const createEvent = async (req, res, next) => {
       date,
       time,
       venue,
-      enableCertificates: enableCertificates || false
+      enableCertificates: enableCertificates === 'true' || enableCertificates === true
     });
+
+    // Handle banner image if uploaded
+    if (req.file) {
+      try {
+        const result = await imageService.processEventBanner(
+          req.file.buffer,
+          event._id.toString(),
+          req.file.mimetype
+        );
+        event.bannerUrl = result.url;
+        await event.save();
+      } catch (imgError) {
+        console.error('Error processing banner image:', imgError);
+        // Event is created, just without banner
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -147,6 +166,11 @@ const updateEvent = async (req, res, next) => {
       });
     }
 
+    // Track if status is changing to completed
+    const previousStatus = event.status;
+    const newStatus = req.body.status;
+    const isCompletingEvent = previousStatus !== 'completed' && newStatus === 'completed';
+
     // Update allowed fields
     const allowedUpdates = [
       'title', 'description', 'eventType', 'department',
@@ -159,12 +183,52 @@ const updateEvent = async (req, res, next) => {
       }
     });
 
+    // Handle banner image upload if present
+    if (req.file) {
+      try {
+        // Delete old banner if exists
+        if (event.bannerUrl) {
+          await imageService.deleteEventBanner(event.bannerUrl);
+        }
+        
+        // Process and save new banner
+        const result = await imageService.processEventBanner(
+          req.file.buffer,
+          event._id.toString(),
+          req.file.mimetype
+        );
+        event.bannerUrl = result.url;
+      } catch (imgError) {
+        console.error('Error processing banner image:', imgError);
+        // Don't fail the entire update if image processing fails
+      }
+    }
+
     await event.save();
+
+    // Auto-generate certificates if event is being marked as completed
+    let certificateResult = null;
+    if (isCompletingEvent && event.enableCertificates) {
+      try {
+        console.log(`[EventController] Auto-generating certificates for event: ${event.title}`);
+        certificateResult = await certificateService.generateCertificatesForEvent(
+          event._id,
+          req.user._id
+        );
+      } catch (certError) {
+        console.error('Error generating certificates:', certError);
+        // Don't fail the update if certificate generation fails
+        certificateResult = { error: certError.message };
+      }
+    }
 
     res.json({
       success: true,
       message: 'Event updated successfully',
-      data: { event }
+      data: { 
+        event,
+        certificates: certificateResult
+      }
     });
   } catch (error) {
     next(error);

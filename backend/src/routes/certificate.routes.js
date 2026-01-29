@@ -11,6 +11,7 @@ const { authenticate, organizerOnly } = require('../middleware/auth.middleware')
 // Student routes
 router.get('/my-certificates', authenticate, certificateController.getMyCertificates);
 router.get('/:certificateId/download', authenticate, certificateController.downloadCertificatePDF);
+router.get('/:certificateId/preview', authenticate, certificateController.previewCertificatePDF);
 
 // Organizer routes
 router.post('/generate/:eventId', authenticate, organizerOnly, certificateController.generateCertificates);

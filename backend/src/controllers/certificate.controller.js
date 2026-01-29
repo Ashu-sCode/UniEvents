@@ -3,9 +3,11 @@
  * Handles certificate generation and download
  */
 
+const path = require('path');
+const fs = require('fs').promises;
 const Certificate = require('../models/Certificate.model');
 const Event = require('../models/Event.model');
-const Attendance = require('../models/Attendance.model');
+const certificateService = require('../services/certificateService');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 
 /**
@@ -50,41 +52,20 @@ const generateCertificates = async (req, res, next) => {
       });
     }
 
-    // Get all attendees
-    const attendees = await Attendance.find({ eventId }).populate('userId');
-
-    if (attendees.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No attendees found for this event'
-      });
-    }
-
-    // Generate certificates for each attendee
-    const certificates = [];
-    for (const attendance of attendees) {
-      // Check if certificate already exists
-      const existingCert = await Certificate.findOne({
-        eventId,
-        userId: attendance.userId._id
-      });
-
-      if (!existingCert) {
-        const cert = await Certificate.create({
-          eventId,
-          userId: attendance.userId._id,
-          issuedBy: req.user._id
-        });
-        certificates.push(cert);
-      }
-    }
+    // Use certificate service for generation
+    const result = await certificateService.generateCertificatesForEvent(
+      eventId,
+      req.user._id
+    );
 
     res.status(201).json({
       success: true,
-      message: `Generated ${certificates.length} new certificates`,
+      message: result.message,
       data: {
-        totalAttendees: attendees.length,
-        newCertificates: certificates.length
+        totalAttendees: result.totalAttendees,
+        generated: result.generated,
+        skipped: result.skipped,
+        errors: result.errors
       }
     });
   } catch (error) {
@@ -99,10 +80,7 @@ const generateCertificates = async (req, res, next) => {
  */
 const getMyCertificates = async (req, res, next) => {
   try {
-    const certificates = await Certificate.find({ userId: req.user._id })
-      .populate('eventId', 'title date department')
-      .populate('issuedBy', 'name')
-      .sort({ issuedAt: -1 });
+    const certificates = await certificateService.getUserCertificates(req.user._id);
 
     res.json({
       success: true,
@@ -143,13 +121,91 @@ const downloadCertificatePDF = async (req, res, next) => {
       });
     }
 
-    // Generate PDF
+    // Check if PDF file exists on disk
+    if (certificate.filePath) {
+      const fullPath = path.join(__dirname, '../..', certificate.filePath);
+      try {
+        await fs.access(fullPath);
+        // File exists, send it
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename=certificate-${certificate.certificateId}.pdf`
+        });
+        return res.sendFile(fullPath);
+      } catch (err) {
+        // File doesn't exist, regenerate
+        console.log('Certificate file not found, regenerating...');
+      }
+    }
+
+    // Generate PDF on-the-fly
     const pdfBuffer = await generateCertificatePDF(certificate);
 
     // Set response headers for PDF download
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename=certificate-${certificate.certificateId}.pdf`,
+      'Content-Length': pdfBuffer.length
+    });
+
+    res.send(pdfBuffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/certificates/:certificateId/preview
+ * @desc    Preview certificate as PDF (inline for iframe viewing)
+ * @access  Private
+ */
+const previewCertificatePDF = async (req, res, next) => {
+  try {
+    const certificate = await Certificate.findOne({
+      certificateId: req.params.certificateId
+    })
+      .populate('eventId')
+      .populate('userId', 'name rollNumber department')
+      .populate('issuedBy', 'name department');
+
+    if (!certificate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Certificate not found'
+      });
+    }
+
+    // Only certificate owner can preview
+    if (certificate.userId._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view this certificate'
+      });
+    }
+
+    // Check if PDF file exists on disk
+    if (certificate.filePath) {
+      const fullPath = path.join(__dirname, '../..', certificate.filePath);
+      try {
+        await fs.access(fullPath);
+        // File exists, send it inline for preview
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename=certificate-${certificate.certificateId}.pdf`
+        });
+        return res.sendFile(fullPath);
+      } catch (err) {
+        console.log('Certificate file not found, regenerating...');
+      }
+    }
+
+    // Generate PDF on-the-fly
+    const pdfBuffer = await generateCertificatePDF(certificate);
+
+    // Set response headers for inline PDF viewing
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename=certificate-${certificate.certificateId}.pdf`,
       'Content-Length': pdfBuffer.length
     });
 
@@ -183,14 +239,16 @@ const getEventCertificates = async (req, res, next) => {
       });
     }
 
-    const certificates = await Certificate.find({ eventId })
-      .populate('userId', 'name email rollNumber department')
-      .sort({ issuedAt: -1 });
+    const certificates = await certificateService.getEventCertificates(eventId);
+    const stats = await certificateService.getCertificateStats(eventId);
 
     res.json({
       success: true,
       count: certificates.length,
-      data: { certificates }
+      data: { 
+        certificates,
+        stats
+      }
     });
   } catch (error) {
     next(error);
@@ -201,5 +259,6 @@ module.exports = {
   generateCertificates,
   getMyCertificates,
   downloadCertificatePDF,
+  previewCertificatePDF,
   getEventCertificates
 };

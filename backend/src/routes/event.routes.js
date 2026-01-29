@@ -9,6 +9,7 @@ const { body } = require('express-validator');
 const eventController = require('../controllers/event.controller');
 const { authenticate, organizerOnly } = require('../middleware/auth.middleware');
 const validateRequest = require('../middleware/validateRequest');
+const { eventBannerUpload, handleUploadError } = require('../middleware/uploadMiddleware');
 
 // Validation rules
 const eventValidation = [
@@ -31,8 +32,24 @@ router.get('/', authenticate, eventController.getEvents);
 router.get('/:id', eventController.getEventById);
 
 // Protected routes (Organizer only)
-router.post('/', authenticate, organizerOnly, eventValidation, validateRequest, eventController.createEvent);
-router.put('/:id', authenticate, organizerOnly, eventController.updateEvent);
+// Create event with optional banner image upload
+router.post('/', 
+  authenticate, 
+  organizerOnly, 
+  eventBannerUpload.single('banner'),
+  handleUploadError,
+  eventController.createEvent
+);
+
+// Update event with optional banner image upload
+router.put('/:id', 
+  authenticate, 
+  organizerOnly, 
+  eventBannerUpload.single('banner'),
+  handleUploadError,
+  eventController.updateEvent
+);
+
 router.delete('/:id', authenticate, organizerOnly, eventController.deleteEvent);
 router.get('/:id/registrations', authenticate, organizerOnly, eventController.getEventRegistrations);
 

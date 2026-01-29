@@ -13,6 +13,7 @@ router.post('/register/:eventId', authenticate, studentOnly, ticketController.re
 router.get('/my-tickets', authenticate, ticketController.getMyTickets);
 router.get('/:ticketId', authenticate, ticketController.getTicketById);
 router.get('/:ticketId/download', authenticate, ticketController.downloadTicketPDF);
+router.get('/:ticketId/preview', authenticate, ticketController.previewTicketPDF);
 
 // Organizer routes - QR verification at event entry
 router.post('/verify', authenticate, organizerOnly, ticketController.verifyTicket);
