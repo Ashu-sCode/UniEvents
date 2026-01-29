@@ -3,20 +3,25 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { eventsAPI, ticketsAPI } from '@/lib/api';
-import { formatDate, getStatusColor, downloadBlob } from '@/lib/utils';
+import { eventsAPI, ticketsAPI, certificatesAPI } from '@/lib/api';
+import { formatDate, getStatusColor, downloadBlob, getImageUrl } from '@/lib/utils';
 import { 
   Calendar, Ticket, Award, LogOut, Search, 
-  MapPin, Clock, Users, Download, QrCode 
+  MapPin, Clock, Users, Download, QrCode, FileText, Eye, ChevronRight 
 } from 'lucide-react';
-import type { Event, Ticket as TicketType } from '@/types';
+import type { Event, Ticket as TicketType, Certificate } from '@/types';
+import CertificatePreviewModal from '@/components/CertificatePreviewModal';
+import TicketPreviewModal from '@/components/TicketPreviewModal';
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [tickets, setTickets] = useState<TicketType[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'events' | 'tickets'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'tickets' | 'certificates'>('events');
+  const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
+  const [previewTicket, setPreviewTicket] = useState<TicketType | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -24,12 +29,14 @@ export default function StudentDashboard() {
 
   const fetchData = async () => {
     try {
-      const [eventsRes, ticketsRes] = await Promise.all([
+      const [eventsRes, ticketsRes, certificatesRes] = await Promise.all([
         eventsAPI.getAll({ upcoming: 'true' }),
         ticketsAPI.getMyTickets(),
+        certificatesAPI.getMyCertificates(),
       ]);
       setEvents(eventsRes.data.data.events);
       setTickets(ticketsRes.data.data.tickets);
+      setCertificates(certificatesRes.data.data.certificates || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -52,6 +59,15 @@ export default function StudentDashboard() {
       downloadBlob(response.data, `ticket-${ticketId}.pdf`);
     } catch (error) {
       alert('Failed to download ticket');
+    }
+  };
+
+  const handleDownloadCertificate = async (certificateId: string) => {
+    try {
+      const response = await certificatesAPI.download(certificateId);
+      downloadBlob(response.data, `certificate-${certificateId}.pdf`);
+    } catch (error) {
+      alert('Failed to download certificate');
     }
   };
 
@@ -89,22 +105,28 @@ export default function StudentDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+        {/* Stat Cards - Clickable */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
           <StatCard
-            icon={<Calendar className="h-5 w-5" />}
+            icon={<Calendar className="h-6 w-6" />}
             label="Upcoming Events"
             value={events.length}
+            onClick={() => setActiveTab('events')}
+            isActive={activeTab === 'events'}
           />
           <StatCard
-            icon={<Ticket className="h-5 w-5" />}
+            icon={<Ticket className="h-6 w-6" />}
             label="My Tickets"
             value={tickets.length}
+            onClick={() => setActiveTab('tickets')}
+            isActive={activeTab === 'tickets'}
           />
           <StatCard
-            icon={<Award className="h-5 w-5" />}
+            icon={<Award className="h-6 w-6" />}
             label="Certificates"
-            value={0}
+            value={certificates.length}
+            onClick={() => setActiveTab('certificates')}
+            isActive={activeTab === 'certificates'}
           />
         </div>
 
@@ -130,11 +152,25 @@ export default function StudentDashboard() {
           >
             My Tickets
           </button>
+          <button
+            onClick={() => setActiveTab('certificates')}
+            className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
+              activeTab === 'certificates'
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+            }`}
+          >
+            Certificates
+          </button>
         </div>
 
         {/* Content */}
         {isLoading ? (
-          <div className="text-center py-16 text-neutral-500">Loading...</div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <CardSkeleton key={i} />
+            ))}
+          </div>
         ) : activeTab === 'events' ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {events.map((event) => (
@@ -151,104 +187,301 @@ export default function StudentDashboard() {
               </p>
             )}
           </div>
-        ) : (
-          <div className="space-y-4">
+        ) : activeTab === 'tickets' ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {tickets.map((ticket) => (
               <TicketCard
                 key={ticket._id}
                 ticket={ticket}
+                onView={() => setPreviewTicket(ticket)}
                 onDownload={() => handleDownloadTicket(ticket.ticketId)}
               />
             ))}
             {tickets.length === 0 && (
-              <p className="text-neutral-500 text-center py-16">
-                You haven't registered for any events yet.
-              </p>
+              <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
+                <Ticket className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
+                <p className="text-neutral-500">
+                  You haven't registered for any events yet.
+                </p>
+                <button
+                  onClick={() => setActiveTab('events')}
+                  className="mt-4 px-4 py-2 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all"
+                >
+                  Browse Events
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {certificates.map((certificate) => (
+              <CertificateCard
+                key={certificate._id}
+                certificate={certificate}
+                onDownload={() => handleDownloadCertificate(certificate.certificateId)}
+                onPreview={() => setPreviewCertificate(certificate)}
+              />
+            ))}
+            {certificates.length === 0 && (
+              <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
+                <p className="text-neutral-500">
+                  No certificates yet. Attend events to earn certificates!
+                </p>
+              </div>
             )}
           </div>
         )}
       </main>
-    </div>
-  );
-}
 
-function StatCard({ icon, label, value }: any) {
-  return (
-    <div className="bg-white rounded-2xl border border-neutral-100 p-6 flex items-center gap-4">
-      <div className="p-3 rounded-xl bg-neutral-100 text-neutral-700">
-        {icon}
-      </div>
-      <div>
-        <p className="text-2xl font-semibold text-neutral-900">{value}</p>
-        <p className="text-sm text-neutral-600">{label}</p>
-      </div>
-    </div>
-  );
-}
+      {/* Certificate Preview Modal */}
+      {previewCertificate && (
+        <CertificatePreviewModal
+          certificateId={previewCertificate.certificateId}
+          eventTitle={previewCertificate.eventId?.title || 'Certificate'}
+          onClose={() => setPreviewCertificate(null)}
+          onDownload={() => {
+            handleDownloadCertificate(previewCertificate.certificateId);
+            setPreviewCertificate(null);
+          }}
+        />
+      )}
 
-function EventCard({ event, isRegistered, onRegister }: any) {
-  return (
-    <div className="bg-white rounded-2xl border border-neutral-100 p-6 hover:border-neutral-200 transition-all">
-      <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
-      <p className="text-sm text-neutral-600 mb-4 line-clamp-2 leading-relaxed">{event.description}</p>
-      
-      <div className="space-y-2.5 text-sm text-neutral-600 mb-5">
-        <div className="flex items-center gap-2.5">
-          <Calendar className="h-4 w-4 text-neutral-400" />
-          {formatDate(event.date, { weekday: undefined })}
-        </div>
-        <div className="flex items-center gap-2.5">
-          <Clock className="h-4 w-4 text-neutral-400" />
-          {event.time}
-        </div>
-        <div className="flex items-center gap-2.5">
-          <MapPin className="h-4 w-4 text-neutral-400" />
-          {event.venue}
-        </div>
-        <div className="flex items-center gap-2.5">
-          <Users className="h-4 w-4 text-neutral-400" />
-          {event.seatsAvailable} seats available
-        </div>
-      </div>
-
-      {isRegistered ? (
-        <button disabled className="btn-success w-full">
-          ✓ Registered
-        </button>
-      ) : event.seatsAvailable > 0 ? (
-        <button onClick={onRegister} className="btn-primary w-full">
-          Register Now
-        </button>
-      ) : (
-        <button disabled className="btn-secondary w-full opacity-60">
-          Sold Out
-        </button>
+      {/* Ticket Preview Modal */}
+      {previewTicket && (
+        <TicketPreviewModal
+          ticketId={previewTicket.ticketId}
+          eventTitle={previewTicket.eventId?.title || 'Event Ticket'}
+          onClose={() => setPreviewTicket(null)}
+          onDownload={() => {
+            handleDownloadTicket(previewTicket.ticketId);
+            setPreviewTicket(null);
+          }}
+        />
       )}
     </div>
   );
 }
 
-function TicketCard({ ticket, onDownload }: any) {
+// Skeleton loaders for loading states
+function CardSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden animate-pulse">
+      <div className="h-40 w-full bg-neutral-200" />
+      <div className="p-5">
+        <div className="h-5 bg-neutral-200 rounded w-3/4 mb-3" />
+        <div className="h-4 bg-neutral-100 rounded w-1/2 mb-2" />
+        <div className="h-4 bg-neutral-100 rounded w-2/3 mb-2" />
+        <div className="h-4 bg-neutral-100 rounded w-1/2 mb-4" />
+        <div className="h-10 bg-neutral-200 rounded-xl w-full" />
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, onClick, isActive }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full bg-white rounded-2xl border p-5 flex items-center gap-4 transition-all text-left group ${
+        isActive 
+          ? 'border-neutral-900 shadow-md' 
+          : 'border-neutral-100 hover:border-neutral-200 hover:shadow-md'
+      }`}
+    >
+      <div className={`p-3 rounded-xl transition-colors ${
+        isActive ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200'
+      }`}>
+        {icon}
+      </div>
+      <div className="flex-1">
+        <p className="text-3xl font-bold text-neutral-900">{value}</p>
+        <p className="text-sm text-neutral-500">{label}</p>
+      </div>
+      <ChevronRight className={`h-5 w-5 transition-all ${
+        isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'
+      }`} />
+    </button>
+  );
+}
+
+function EventCard({ event, isRegistered, onRegister }: any) {
+  const bannerUrl = getImageUrl(event.bannerUrl);
+  
+  return (
+    <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all">
+      {/* Event Banner Image */}
+      <div className="h-40 w-full overflow-hidden">
+        {bannerUrl ? (
+          <img 
+            src={bannerUrl} 
+            alt={event.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
+            <Calendar className="h-12 w-12 text-neutral-400" />
+          </div>
+        )}
+      </div>
+      
+      <div className="p-5">
+        <h3 className="font-semibold text-lg text-neutral-900 mb-1 line-clamp-1">{event.title}</h3>
+        <p className="text-xs text-neutral-500 mb-3">{event.department}</p>
+        
+        <div className="space-y-2 text-sm text-neutral-600 mb-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-neutral-400" />
+            {formatDate(event.date, { weekday: undefined })}
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-neutral-400" />
+            {event.time}
+          </div>
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-neutral-400" />
+            <span className="line-clamp-1">{event.venue}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-neutral-400" />
+            {event.seatsAvailable} seats available
+          </div>
+        </div>
+
+        {isRegistered ? (
+          <button disabled className="w-full py-2.5 rounded-xl font-medium bg-neutral-100 text-neutral-700">
+            ✓ Registered
+          </button>
+        ) : event.seatsAvailable > 0 ? (
+          <button 
+            onClick={onRegister} 
+            className="w-full py-2.5 rounded-xl font-medium bg-neutral-900 text-white hover:bg-neutral-800 transition-colors"
+          >
+            Register Now
+          </button>
+        ) : (
+          <button disabled className="w-full py-2.5 rounded-xl font-medium bg-neutral-100 text-neutral-400">
+            Sold Out
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TicketCard({ ticket, onView, onDownload }: any) {
   const event = ticket.eventId;
+  const bannerUrl = getImageUrl(event?.bannerUrl);
 
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div>
-        <h3 className="font-semibold text-lg text-neutral-900">{event?.title || 'Event'}</h3>
-        <p className="text-sm text-neutral-600 mt-1">
-          {event?.date && formatDate(event.date)} at {event?.time}
+    <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all">
+      {/* Event Banner */}
+      <div className="h-32 w-full overflow-hidden relative">
+        {bannerUrl ? (
+          <img 
+            src={bannerUrl} 
+            alt={event?.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
+            <Ticket className="h-10 w-10 text-neutral-400" />
+          </div>
+        )}
+        {/* Status Badge */}
+        <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm ${getStatusColor(ticket.status)}`}>
+          {ticket.status.toUpperCase()}
+        </span>
+      </div>
+
+      <div className="p-4">
+        {/* Event Title */}
+        <h3 className="font-semibold text-neutral-900 mb-2 line-clamp-1">{event?.title || 'Event'}</h3>
+        
+        {/* Event Details */}
+        <div className="space-y-1.5 text-sm text-neutral-600 mb-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-neutral-400" />
+            <span>{event?.date && formatDate(event.date, { weekday: undefined })}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-neutral-400" />
+            <span>{event?.time}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-neutral-400" />
+            <span className="line-clamp-1">{event?.venue}</span>
+          </div>
+        </div>
+
+        {/* Ticket ID */}
+        <p className="text-xs font-mono text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-lg mb-4 text-center">
+          {ticket.ticketId}
         </p>
-        <p className="text-sm text-neutral-600">{event?.venue}</p>
-        <div className="mt-3">
-          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
-            {ticket.status.toUpperCase()}
-          </span>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={onView}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-neutral-100 text-neutral-700 rounded-xl font-medium hover:bg-neutral-200 transition-all text-sm"
+          >
+            <Eye className="h-4 w-4" />
+            View
+          </button>
+          <button
+            onClick={onDownload}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all text-sm"
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CertificateCard({ certificate, onDownload, onPreview }: any) {
+  const event = certificate.eventId;
+
+  return (
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6 hover:shadow-lg hover:scale-[1.02] transition-all">
+      {/* Certificate Icon Header */}
+      <div className="flex items-center justify-center mb-4">
+        <div className="p-3 rounded-full bg-neutral-100 text-neutral-700">
+          <Award className="h-8 w-8" />
+        </div>
+      </div>
+      
+      {/* Content */}
+      <div className="text-center">
+        <h3 className="font-semibold text-lg text-neutral-900 mb-1">
+          {event?.title || 'Event Certificate'}
+        </h3>
+        <p className="text-sm text-neutral-600 mb-1">
+          {event?.department}
+        </p>
+        <p className="text-xs text-neutral-500 mb-4">
+          {event?.date && formatDate(event.date, { weekday: undefined })}
+        </p>
+        
+        {/* Certificate ID */}
+        <p className="text-xs font-mono text-neutral-600 bg-neutral-100 px-3 py-1 rounded-full inline-block mb-4">
+          {certificate.certificateId}
+        </p>
+      </div>
+      
+      {/* Action Buttons */}
       <div className="flex gap-2">
         <button
+          onClick={onPreview}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-100 text-neutral-700 rounded-xl font-medium hover:bg-neutral-200 transition-all"
+        >
+          <FileText className="h-4 w-4" />
+          Preview
+        </button>
+        <button
           onClick={onDownload}
-          className="btn-secondary flex items-center gap-2"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all"
         >
           <Download className="h-4 w-4" />
           Download

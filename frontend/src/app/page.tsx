@@ -87,7 +87,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-neutral-900 text-neutral-400 py-10 mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm">© 2024 UniEvent. University Event Management System.</p>
+          <p className="text-sm">© 2026 UniEvent. University Event Management System.</p>
         </div>
       </footer>
     </div>

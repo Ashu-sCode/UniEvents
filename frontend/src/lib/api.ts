@@ -69,10 +69,24 @@ export const eventsAPI = {
     api.get('/events', { params }),
   getById: (id: string) => 
     api.get(`/events/${id}`),
-  create: (data: any) => 
-    api.post('/events', data),
-  update: (id: string, data: any) => 
-    api.put(`/events/${id}`, data),
+  create: (data: FormData | any) => {
+    // Check if data is FormData for image upload
+    if (data instanceof FormData) {
+      return api.post('/events', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    }
+    return api.post('/events', data);
+  },
+  update: (id: string, data: FormData | any) => {
+    // Check if data is FormData for image upload
+    if (data instanceof FormData) {
+      return api.put(`/events/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    }
+    return api.put(`/events/${id}`, data);
+  },
   delete: (id: string) => 
     api.delete(`/events/${id}`),
   getRegistrations: (id: string) => 
@@ -90,6 +104,8 @@ export const ticketsAPI = {
     api.post('/tickets/verify', data),
   download: (ticketId: string) => 
     api.get(`/tickets/${ticketId}/download`, { responseType: 'blob' }),
+  preview: (ticketId: string) => 
+    api.get(`/tickets/${ticketId}/preview`, { responseType: 'blob' }),
 };
 
 export const attendanceAPI = {
@@ -108,6 +124,8 @@ export const certificatesAPI = {
     api.post(`/certificates/generate/${eventId}`),
   download: (certificateId: string) => 
     api.get(`/certificates/${certificateId}/download`, { responseType: 'blob' }),
+  preview: (certificateId: string) => 
+    api.get(`/certificates/${certificateId}/preview`, { responseType: 'blob' }),
   getEventCertificates: (eventId: string) => 
     api.get(`/certificates/event/${eventId}`),
 };

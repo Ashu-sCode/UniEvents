@@ -67,6 +67,22 @@ export interface Certificate {
   issuedAt: string;
   issuedBy: User | string;
   pdfUrl?: string;
+  filePath?: string;
+}
+
+// Certificate stats for organizers
+export interface CertificateStats {
+  totalCertificates: number;
+  totalAttendees: number;
+  pendingCertificates: number;
+}
+
+// Certificate generation result
+export interface CertificateGenerationResult {
+  totalAttendees: number;
+  generated: number;
+  skipped: number;
+  errors?: Array<{ userId: string; error: string }>;
 }
 
 // API Response types

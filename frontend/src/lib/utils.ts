@@ -77,3 +77,37 @@ export function downloadBlob(blob: Blob, filename: string) {
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 }
+
+/**
+ * Get API base URL (without /api suffix)
+ */
+export function getApiBaseUrl(): string {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  return apiUrl.replace('/api', '');
+}
+
+/**
+ * Get full URL for uploaded images
+ */
+export function getImageUrl(relativePath: string | null | undefined): string | null {
+  if (!relativePath) return null;
+  const baseUrl = getApiBaseUrl();
+  // Handle both /uploads/... and uploads/... formats
+  const cleanPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  return `${baseUrl}${cleanPath}`;
+}
+
+/**
+ * Validate file type for image upload
+ */
+export function isValidImageType(file: File): boolean {
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  return validTypes.includes(file.type);
+}
+
+/**
+ * Validate file size (in bytes)
+ */
+export function isValidFileSize(file: File, maxSizeBytes: number): boolean {
+  return file.size <= maxSizeBytes;
+}
