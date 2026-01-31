@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { eventsAPI, ticketsAPI, certificatesAPI } from '@/lib/api';
 import { formatDate, getStatusColor, downloadBlob, getImageUrl } from '@/lib/utils';
-import { 
-  Calendar, Ticket, Award, LogOut, Search, 
-  MapPin, Clock, Users, Download, QrCode, FileText, Eye, ChevronRight 
+import {
+  Calendar, Ticket, Award, LogOut,
+  MapPin, Clock, Users, Download, FileText, Eye, ChevronRight
 } from 'lucide-react';
 import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
@@ -15,6 +15,7 @@ import TicketPreviewModal from '@/components/TicketPreviewModal';
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth();
+  const toast = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [tickets, setTickets] = useState<TicketType[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -47,9 +48,10 @@ export default function StudentDashboard() {
   const handleRegister = async (eventId: string) => {
     try {
       await ticketsAPI.register(eventId);
+      toast.success('Successfully registered for the event');
       fetchData(); // Refresh data
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Registration failed');
+      toast.error(error.response?.data?.message || 'Registration failed');
     }
   };
 
@@ -57,8 +59,9 @@ export default function StudentDashboard() {
     try {
       const response = await ticketsAPI.download(ticketId);
       downloadBlob(response.data, `ticket-${ticketId}.pdf`);
+      toast.success('Ticket downloaded');
     } catch (error) {
-      alert('Failed to download ticket');
+      toast.error('Failed to download ticket');
     }
   };
 
@@ -66,15 +69,21 @@ export default function StudentDashboard() {
     try {
       const response = await certificatesAPI.download(certificateId);
       downloadBlob(response.data, `certificate-${certificateId}.pdf`);
+      toast.success('Certificate downloaded');
     } catch (error) {
-      alert('Failed to download certificate');
+      toast.error('Failed to download certificate');
     }
   };
 
   const isRegistered = (eventId: string) => {
     return tickets.some(t => {
-      const eId = typeof t.eventId === 'string' ? t.eventId : t.eventId._id;
-      return eId === eventId;
+      // `t.eventId` can be a string, a populated event object, or null (e.g. if the event was deleted).
+      const eId =
+        typeof t.eventId === 'string'
+          ? t.eventId
+          : t.eventId?._id;
+
+      return !!eId && eId === eventId;
     });
   };
 
@@ -237,7 +246,11 @@ export default function StudentDashboard() {
       {previewCertificate && (
         <CertificatePreviewModal
           certificateId={previewCertificate.certificateId}
-          eventTitle={previewCertificate.eventId?.title || 'Certificate'}
+          eventTitle={
+            typeof previewCertificate.eventId === 'string'
+              ? 'Certificate'
+              : previewCertificate.eventId?.title || 'Certificate'
+          }
           onClose={() => setPreviewCertificate(null)}
           onDownload={() => {
             handleDownloadCertificate(previewCertificate.certificateId);
@@ -250,7 +263,11 @@ export default function StudentDashboard() {
       {previewTicket && (
         <TicketPreviewModal
           ticketId={previewTicket.ticketId}
-          eventTitle={previewTicket.eventId?.title || 'Event Ticket'}
+          eventTitle={
+            typeof previewTicket.eventId === 'string'
+              ? 'Event Ticket'
+              : previewTicket.eventId?.title || 'Event Ticket'
+          }
           onClose={() => setPreviewTicket(null)}
           onDownload={() => {
             handleDownloadTicket(previewTicket.ticketId);

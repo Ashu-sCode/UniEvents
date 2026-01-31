@@ -2,24 +2,34 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { eventsAPI, ticketsAPI, attendanceAPI, certificatesAPI } from '@/lib/api';
+import { useToast } from '@/context/ToastContext';
+import { eventsAPI, ticketsAPI } from '@/lib/api';
 import { formatDate, getStatusColor, getImageUrl, isValidImageType } from '@/lib/utils';
-import { 
-  Calendar, Ticket, Users, LogOut, Plus, 
-  QrCode, CheckCircle, XCircle, AlertCircle,
-  BarChart3, Eye, Camera, Keyboard, Award, Image, Upload, X,
+import {
+  Calendar, Ticket, Users, LogOut, Plus,
+  QrCode, CheckCircle, XCircle,
+  BarChart3, Eye, Camera, Keyboard, Award, Upload, X,
   Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin
 } from 'lucide-react';
 import type { Event } from '@/types';
 import CameraScan from '@/components/CameraScan';
+import { EditEventModal } from '@/components/EditEventModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 export default function OrganizerDashboard() {
   const { user, logout } = useAuth();
+  const toast = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedScanEvent, setSelectedScanEvent] = useState<Event | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedEditEvent, setSelectedEditEvent] = useState<Event | null>(null);
+
+  // Delete confirmation modal state (kept at page-level to avoid nested fixed-modal glitches)
+  const [deleteCandidate, setDeleteCandidate] = useState<Event | null>(null);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   
   // Filter and sort state
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -52,8 +62,25 @@ export default function OrganizerDashboard() {
       setEvents(response.data.data.events);
     } catch (error) {
       console.error('Error fetching events:', error);
+      toast.error('Failed to load events');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteCandidate) return;
+
+    setIsDeletingEvent(true);
+    try {
+      await eventsAPI.delete(deleteCandidate._id);
+      toast.success('Event deleted successfully');
+      setDeleteCandidate(null);
+      fetchEvents();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to delete event');
+    } finally {
+      setIsDeletingEvent(false);
     }
   };
 
@@ -178,9 +205,15 @@ export default function OrganizerDashboard() {
                 key={event._id}
                 event={event}
                 onScan={() => {
-                  setSelectedEvent(event);
+                  setSelectedScanEvent(event);
                   setShowScanModal(true);
                 }}
+                onEdit={() => {
+                  setSelectedEditEvent(event);
+                  setShowEditModal(true);
+                }}
+                onDelete={() => setDeleteCandidate(event)}
+                isDeleting={isDeletingEvent && deleteCandidate?._id === event._id}
                 onRefresh={fetchEvents}
               />
             ))}
@@ -223,12 +256,40 @@ export default function OrganizerDashboard() {
       )}
 
       {/* QR Scan Modal */}
-      {showScanModal && selectedEvent && (
+      {showScanModal && selectedScanEvent && (
         <QRScanModal
-          event={selectedEvent}
+          event={selectedScanEvent}
           onClose={() => setShowScanModal(false)}
         />
       )}
+
+      {/* Edit Event Modal */}
+      {showEditModal && selectedEditEvent && (
+        <EditEventModal
+          event={selectedEditEvent}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            setShowEditModal(false);
+            fetchEvents();
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteCandidate}
+        onClose={() => {
+          if (isDeletingEvent) return;
+          setDeleteCandidate(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Delete event"
+        message="Are you sure you want to delete this event?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeletingEvent}
+      />
     </div>
   );
 }
@@ -265,40 +326,36 @@ function EventCardSkeleton() {
   );
 }
 
-function EventCard({ event, onScan, onRefresh }: any) {
+function EventCard({ event, onScan, onEdit, onDelete, isDeleting, onRefresh }: any) {
+  const toast = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleStatusChange = async (newStatus: string) => {
     setIsUpdating(true);
     try {
       const response = await eventsAPI.update(event._id, { status: newStatus });
-      if (response.data.data.certificates) {
-        const certResult = response.data.data.certificates;
-        if (certResult.generated > 0) {
-          alert(`Event marked as completed! ${certResult.generated} certificates generated.`);
+      const certResult = response.data.data.certificates;
+
+      if (newStatus === 'published') {
+        toast.success('Event published');
+      } else if (newStatus === 'completed') {
+        if (certResult?.generated > 0) {
+          toast.success(`Event completed — ${certResult.generated} certificates generated`);
+        } else {
+          toast.success('Event marked as completed');
         }
+      } else {
+        toast.success('Event status updated');
       }
+
       onRefresh();
-    } catch (error) {
-      alert('Failed to update event status');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update event status');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this event? This cannot be undone.')) return;
-    setIsDeleting(true);
-    try {
-      await eventsAPI.delete(event._id);
-      onRefresh();
-    } catch (error) {
-      alert('Failed to delete event');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const bannerUrl = getImageUrl(event.bannerUrl);
 
@@ -397,13 +454,13 @@ function EventCard({ event, onScan, onRefresh }: any) {
         <div className="flex gap-2 pt-3 border-t border-neutral-100">
           <button
             className="flex-1 py-2 px-2 text-neutral-600 text-xs font-medium rounded-lg hover:bg-neutral-100 transition-all flex items-center justify-center gap-1.5"
-            onClick={() => alert('Edit feature coming soon')}
+            onClick={onEdit}
           >
             <Pencil className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Edit</span>
           </button>
           <button
-            onClick={handleDelete}
+            onClick={onDelete}
             disabled={isDeleting}
             className="flex-1 py-2 px-2 text-red-500 text-xs font-medium rounded-lg hover:bg-red-50 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
@@ -412,7 +469,7 @@ function EventCard({ event, onScan, onRefresh }: any) {
           </button>
           <button
             className="flex-1 py-2 px-2 text-neutral-600 text-xs font-medium rounded-lg hover:bg-neutral-100 transition-all flex items-center justify-center gap-1.5"
-            onClick={() => alert('View details coming soon')}
+            onClick={() => toast.info('Event details view is not available yet')}
           >
             <Eye className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">View</span>
@@ -424,6 +481,7 @@ function EventCard({ event, onScan, onRefresh }: any) {
 }
 
 function CreateEventModal({ onClose, onSuccess }: any) {
+  const toast = useToast();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -444,11 +502,11 @@ function CreateEventModal({ onClose, onSuccess }: any) {
     const file = e.target.files?.[0];
     if (file) {
       if (!isValidImageType(file)) {
-        alert('Please select a valid image file (JPG, PNG, or WEBP)');
+        toast.error('Please select a valid image file (JPG, PNG, or WEBP)');
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        toast.error('File size must be less than 5MB');
         return;
       }
       setBannerFile(file);
@@ -479,9 +537,10 @@ function CreateEventModal({ onClose, onSuccess }: any) {
       } else {
         await eventsAPI.create(formData);
       }
+      toast.success('Event created successfully');
       onSuccess();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to create event');
+      toast.error(error.response?.data?.message || 'Failed to create event');
     } finally {
       setIsLoading(false);
     }
