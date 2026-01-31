@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
 import { Button } from '@/components/ui';
 
+const PWA_INSTALL_DISMISSED_KEY = 'pwaInstallDismissed';
+
 export function ServiceWorkerRegistration() {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -15,8 +17,6 @@ export function ServiceWorkerRegistration() {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
-          console.log('SW registered:', registration.scope);
-
           // Check for updates
           registration.onupdatefound = () => {
             const installingWorker = registration.installing;
@@ -39,11 +39,15 @@ export function ServiceWorkerRegistration() {
 
     // Listen for install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
+      // Only show once (persisted in localStorage)
+      if (localStorage.getItem(PWA_INSTALL_DISMISSED_KEY) === 'true') return;
+
       e.preventDefault();
       setDeferredPrompt(e);
-      
+
       // Show install prompt after a delay (not immediately)
       setTimeout(() => {
+        if (localStorage.getItem(PWA_INSTALL_DISMISSED_KEY) === 'true') return;
         setShowInstallPrompt(true);
       }, 30000); // 30 seconds
     };
@@ -55,18 +59,20 @@ export function ServiceWorkerRegistration() {
     };
   }, []);
 
+  const dismissInstallPrompt = () => {
+    localStorage.setItem(PWA_INSTALL_DISMISSED_KEY, 'true');
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
+  };
+
   const handleInstall = async () => {
     if (!deferredPrompt) return;
 
     deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-      console.log('User accepted install');
-    }
-    
-    setDeferredPrompt(null);
-    setShowInstallPrompt(false);
+    await deferredPrompt.userChoice;
+
+    // Either way, don't keep nagging this user.
+    dismissInstallPrompt();
   };
 
   const handleUpdate = () => {
@@ -94,8 +100,9 @@ export function ServiceWorkerRegistration() {
               </p>
             </div>
             <button
-              onClick={() => setShowInstallPrompt(false)}
+              onClick={dismissInstallPrompt}
               className="p-1 text-neutral-400 hover:text-neutral-600"
+              aria-label="Dismiss install prompt"
             >
               <X className="h-4 w-4" />
             </button>
@@ -103,7 +110,7 @@ export function ServiceWorkerRegistration() {
           <div className="flex gap-2 mt-3">
             <Button
               variant="secondary"
-              onClick={() => setShowInstallPrompt(false)}
+              onClick={dismissInstallPrompt}
               className="flex-1 text-sm"
             >
               Not now
