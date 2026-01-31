@@ -1,0 +1,153 @@
+'use client';
+
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+interface Toast {
+  id: string;
+  type: ToastType;
+  message: string;
+  duration?: number;
+}
+
+interface ToastContextType {
+  toasts: Toast[];
+  success: (message: string, duration?: number) => void;
+  error: (message: string, duration?: number) => void;
+  warning: (message: string, duration?: number) => void;
+  info: (message: string, duration?: number) => void;
+  dismiss: (id: string) => void;
+}
+
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
+
+const DEFAULT_DURATION = 4000;
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const addToast = useCallback((type: ToastType, message: string, duration = DEFAULT_DURATION) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    const newToast: Toast = { id, type, message, duration };
+    
+    setToasts(prev => [...prev, newToast]);
+
+    // Auto dismiss
+    if (duration > 0) {
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, duration);
+    }
+  }, []);
+
+  const dismiss = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const success = useCallback((message: string, duration?: number) => {
+    addToast('success', message, duration);
+  }, [addToast]);
+
+  const error = useCallback((message: string, duration?: number) => {
+    addToast('error', message, duration);
+  }, [addToast]);
+
+  const warning = useCallback((message: string, duration?: number) => {
+    addToast('warning', message, duration);
+  }, [addToast]);
+
+  const info = useCallback((message: string, duration?: number) => {
+    addToast('info', message, duration);
+  }, [addToast]);
+
+  return (
+    <ToastContext.Provider value={{ toasts, success, error, warning, info, dismiss }}>
+      {children}
+      <ToastContainer toasts={toasts} dismiss={dismiss} />
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (context === undefined) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
+}
+
+// Toast Container Component
+function ToastContainer({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: string) => void }) {
+  if (toasts.length === 0) return null;
+
+  return (
+    <>
+      {/* Desktop: Top-right */}
+      <div className="hidden sm:flex fixed top-4 right-4 z-[100] flex-col gap-2 pointer-events-none">
+        {toasts.map(toast => (
+          <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
+        ))}
+      </div>
+      
+      {/* Mobile: Bottom-center */}
+      <div className="sm:hidden fixed bottom-4 left-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+        {toasts.map(toast => (
+          <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+// Individual Toast Item
+function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+  const icons = {
+    success: <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />,
+    error: <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />,
+    warning: <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />,
+    info: <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />,
+  };
+
+  const bgColors = {
+    success: 'bg-green-50 border-green-200',
+    error: 'bg-red-50 border-red-200',
+    warning: 'bg-amber-50 border-amber-200',
+    info: 'bg-blue-50 border-blue-200',
+  };
+
+  const textColors = {
+    success: 'text-green-800',
+    error: 'text-red-800',
+    warning: 'text-amber-800',
+    info: 'text-blue-800',
+  };
+
+  return (
+    <div
+      className={cn(
+        'pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-lg',
+        'animate-in slide-in-from-right-full sm:slide-in-from-top-2 fade-in duration-300',
+        'max-w-sm w-full sm:w-auto sm:min-w-[320px]',
+        bgColors[toast.type]
+      )}
+    >
+      {icons[toast.type]}
+      <p className={cn('flex-1 text-sm font-medium', textColors[toast.type])}>
+        {toast.message}
+      </p>
+      <button
+        onClick={() => onDismiss(toast.id)}
+        className={cn(
+          'p-1 rounded-lg transition-colors flex-shrink-0',
+          'hover:bg-black/5',
+          textColors[toast.type]
+        )}
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
