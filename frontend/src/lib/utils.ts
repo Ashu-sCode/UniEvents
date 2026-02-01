@@ -91,6 +91,12 @@ export function getApiBaseUrl(): string {
  */
 export function getImageUrl(relativePath: string | null | undefined): string | null {
   if (!relativePath) return null;
+
+  // If already absolute, return as-is
+  if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+    return relativePath;
+  }
+
   const baseUrl = getApiBaseUrl();
   // Handle both /uploads/... and uploads/... formats
   const cleanPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;

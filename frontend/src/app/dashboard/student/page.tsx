@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { eventsAPI, ticketsAPI, certificatesAPI } from '@/lib/api';
@@ -21,6 +21,7 @@ export default function StudentDashboard() {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'events' | 'tickets' | 'certificates'>('events');
+  const [ticketFilter, setTicketFilter] = useState<'all' | 'unused' | 'used' | 'cancelled'>('all');
   const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
   const [previewTicket, setPreviewTicket] = useState<TicketType | null>(null);
 
@@ -86,6 +87,31 @@ export default function StudentDashboard() {
       return !!eId && eId === eventId;
     });
   };
+
+  const sortedAndFilteredTickets = useMemo(() => {
+    const filtered = ticketFilter === 'all'
+      ? tickets
+      : tickets.filter(t => t.status === ticketFilter);
+
+    // Stable sort: keep original index as final tie-breaker
+    const withIndex = filtered.map((t, idx) => ({ t, idx }));
+
+    const getEventDateMs = (ticket: TicketType): number => {
+      const event = typeof ticket.eventId === 'object' ? ticket.eventId : null;
+      const date = event?.date;
+      const ms = date ? new Date(date).getTime() : Number.POSITIVE_INFINITY;
+      return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+    };
+
+    withIndex.sort((a, b) => {
+      const aMs = getEventDateMs(a.t);
+      const bMs = getEventDateMs(b.t);
+      if (aMs !== bMs) return aMs - bMs;
+      return a.idx - b.idx;
+    });
+
+    return withIndex.map(x => x.t);
+  }, [tickets, ticketFilter]);
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -197,29 +223,65 @@ export default function StudentDashboard() {
             )}
           </div>
         ) : activeTab === 'tickets' ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {tickets.map((ticket) => (
-              <TicketCard
-                key={ticket._id}
-                ticket={ticket}
-                onView={() => setPreviewTicket(ticket)}
-                onDownload={() => handleDownloadTicket(ticket.ticketId)}
-              />
-            ))}
-            {tickets.length === 0 && (
-              <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
-                <Ticket className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
-                <p className="text-neutral-500">
-                  You haven't registered for any events yet.
-                </p>
+          <div className="space-y-4">
+            {/* Filter pills */}
+            <div className="flex flex-wrap gap-2">
+              {([
+                { key: 'all', label: 'All' },
+                { key: 'unused', label: 'Unused' },
+                { key: 'used', label: 'Used' },
+                { key: 'cancelled', label: 'Cancelled' },
+              ] as const).map(({ key, label }) => (
                 <button
-                  onClick={() => setActiveTab('events')}
-                  className="mt-4 px-4 py-2 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all"
+                  key={key}
+                  onClick={() => setTicketFilter(key)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                    ticketFilter === key
+                      ? 'bg-neutral-900 text-white border-neutral-900'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                  }`}
                 >
-                  Browse Events
+                  {label}
                 </button>
-              </div>
-            )}
+              ))}
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {sortedAndFilteredTickets.map((ticket) => (
+                <TicketCard
+                  key={ticket._id}
+                  ticket={ticket}
+                  onView={() => setPreviewTicket(ticket)}
+                  onDownload={() => handleDownloadTicket(ticket.ticketId)}
+                />
+              ))}
+
+              {/* Empty states */}
+              {tickets.length === 0 ? (
+                <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
+                  <Ticket className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
+                  <p className="text-neutral-500">
+                    You haven't registered for any events yet.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('events')}
+                    className="mt-4 px-4 py-2 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all"
+                  >
+                    Browse Events
+                  </button>
+                </div>
+              ) : sortedAndFilteredTickets.length === 0 ? (
+                <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
+                  <p className="text-neutral-600">No tickets match this filter.</p>
+                  <button
+                    onClick={() => setTicketFilter('all')}
+                    className="mt-4 px-4 py-2 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all"
+                  >
+                    Show All Tickets
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -386,7 +448,8 @@ function EventCard({ event, isRegistered, onRegister }: any) {
 }
 
 function TicketCard({ ticket, onView, onDownload }: any) {
-  const event = ticket.eventId;
+  const event = typeof ticket.eventId === 'object' ? ticket.eventId : null;
+  const hasEvent = !!event;
   const bannerUrl = getImageUrl(event?.bannerUrl);
 
   return (
@@ -394,16 +457,19 @@ function TicketCard({ ticket, onView, onDownload }: any) {
       {/* Event Banner */}
       <div className="h-32 w-full overflow-hidden relative">
         {bannerUrl ? (
-          <img 
-            src={bannerUrl} 
-            alt={event?.title}
+          <img
+            src={bannerUrl}
+            alt={event?.title || 'Event banner'}
+            loading="lazy"
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
+          <div className="w-full h-full bg-neutral-100 flex flex-col items-center justify-center text-center px-4">
             <Ticket className="h-10 w-10 text-neutral-400" />
+            <p className="mt-2 text-xs text-neutral-500">No banner available</p>
           </div>
         )}
+
         {/* Status Badge */}
         <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm ${getStatusColor(ticket.status)}`}>
           {ticket.status.toUpperCase()}
@@ -412,23 +478,27 @@ function TicketCard({ ticket, onView, onDownload }: any) {
 
       <div className="p-4">
         {/* Event Title */}
-        <h3 className="font-semibold text-neutral-900 mb-2 line-clamp-1">{event?.title || 'Event'}</h3>
-        
-        {/* Event Details */}
-        <div className="space-y-1.5 text-sm text-neutral-600 mb-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-neutral-400" />
-            <span>{event?.date && formatDate(event.date, { weekday: undefined })}</span>
+        <h3 className="font-semibold text-neutral-900 mb-2 line-clamp-1">
+          {hasEvent ? event.title : 'Event deleted'}
+        </h3>
+
+        {/* Event Details (hide if event missing/deleted) */}
+        {hasEvent && (
+          <div className="space-y-1.5 text-sm text-neutral-600 mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-neutral-400" />
+              <span>{event?.date && formatDate(event.date, { weekday: undefined })}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-neutral-400" />
+              <span>{event?.time}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-neutral-400" />
+              <span className="line-clamp-1">{event?.venue}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-neutral-400" />
-            <span>{event?.time}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-neutral-400" />
-            <span className="line-clamp-1">{event?.venue}</span>
-          </div>
-        </div>
+        )}
 
         {/* Ticket ID */}
         <p className="text-xs font-mono text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-lg mb-4 text-center">
