@@ -3,11 +3,10 @@
  * Handles certificate generation and download
  */
 
-const path = require('path');
-const fs = require('fs').promises;
 const Certificate = require('../models/Certificate.model');
 const Event = require('../models/Event.model');
 const certificateService = require('../services/certificateService');
+const fileStorageService = require('../services/fileStorageService');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 
 /**
@@ -121,25 +120,48 @@ const downloadCertificatePDF = async (req, res, next) => {
       });
     }
 
-    // Check if PDF file exists on disk
-    if (certificate.filePath) {
-      const fullPath = path.join(__dirname, '../..', certificate.filePath);
-      try {
-        await fs.access(fullPath);
-        // File exists, send it
-        res.set({
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename=certificate-${certificate.certificateId}.pdf`
-        });
-        return res.sendFile(fullPath);
-      } catch (err) {
-        // File doesn't exist, regenerate
-        console.log('Certificate file not found, regenerating...');
-      }
+    // If stored in GridFS, stream it
+    if (certificate.pdfFileId) {
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=certificate-${certificate.certificateId}.pdf`
+      });
+
+      const stream = fileStorageService.openDownloadStream({
+        bucket: 'certificates',
+        fileId: certificate.pdfFileId
+      });
+
+      stream.on('error', (err) => next(err));
+      return stream.pipe(res);
     }
 
-    // Generate PDF on-the-fly
+    // Generate PDF on-the-fly (fallback)
     const pdfBuffer = await generateCertificatePDF(certificate);
+
+    // Optional backfill: store into GridFS so future requests stream
+    const filename = `certificate-${certificate.certificateId}.pdf`;
+    try {
+      const { fileId } = await fileStorageService.saveBuffer({
+        bucket: 'certificates',
+        filename,
+        contentType: 'application/pdf',
+        buffer: pdfBuffer,
+        metadata: {
+          kind: 'certificate',
+          certificateId: certificate.certificateId,
+          eventId: certificate.eventId?._id?.toString(),
+          userId: certificate.userId?._id?.toString()
+        }
+      });
+
+      certificate.pdfFileId = fileId;
+      certificate.filePath = null;
+      await certificate.save();
+    } catch (storeErr) {
+      // Do not fail download if storage fails
+      console.error('Failed to store generated certificate in GridFS:', storeErr);
+    }
 
     // Set response headers for PDF download
     res.set({
@@ -183,24 +205,47 @@ const previewCertificatePDF = async (req, res, next) => {
       });
     }
 
-    // Check if PDF file exists on disk
-    if (certificate.filePath) {
-      const fullPath = path.join(__dirname, '../..', certificate.filePath);
-      try {
-        await fs.access(fullPath);
-        // File exists, send it inline for preview
-        res.set({
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `inline; filename=certificate-${certificate.certificateId}.pdf`
-        });
-        return res.sendFile(fullPath);
-      } catch (err) {
-        console.log('Certificate file not found, regenerating...');
-      }
+    // If stored in GridFS, stream it
+    if (certificate.pdfFileId) {
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename=certificate-${certificate.certificateId}.pdf`
+      });
+
+      const stream = fileStorageService.openDownloadStream({
+        bucket: 'certificates',
+        fileId: certificate.pdfFileId
+      });
+
+      stream.on('error', (err) => next(err));
+      return stream.pipe(res);
     }
 
-    // Generate PDF on-the-fly
+    // Generate PDF on-the-fly (fallback)
     const pdfBuffer = await generateCertificatePDF(certificate);
+
+    // Optional backfill into GridFS
+    const filename = `certificate-${certificate.certificateId}.pdf`;
+    try {
+      const { fileId } = await fileStorageService.saveBuffer({
+        bucket: 'certificates',
+        filename,
+        contentType: 'application/pdf',
+        buffer: pdfBuffer,
+        metadata: {
+          kind: 'certificate',
+          certificateId: certificate.certificateId,
+          eventId: certificate.eventId?._id?.toString(),
+          userId: certificate.userId?._id?.toString()
+        }
+      });
+
+      certificate.pdfFileId = fileId;
+      certificate.filePath = null;
+      await certificate.save();
+    } catch (storeErr) {
+      console.error('Failed to store generated certificate in GridFS:', storeErr);
+    }
 
     // Set response headers for inline PDF viewing
     res.set({

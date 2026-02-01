@@ -94,7 +94,7 @@ const registerForEvent = async (req, res, next) => {
     });
 
     // Populate for response
-    await ticket.populate('eventId', 'title date time venue');
+    await ticket.populate('eventId', 'title date time venue bannerUrl department eventType');
     await ticket.populate('userId', 'name rollNumber department');
 
     res.status(201).json({
@@ -115,7 +115,7 @@ const registerForEvent = async (req, res, next) => {
 const getMyTickets = async (req, res, next) => {
   try {
     const tickets = await Ticket.find({ userId: req.user._id })
-      .populate('eventId', 'title date time venue status')
+      .populate('eventId', 'title date time venue status bannerUrl department eventType')
       .sort({ createdAt: -1 });
 
     res.json({

@@ -50,6 +50,7 @@ const createEvent = async (req, res, next) => {
           event._id.toString(),
           req.file.mimetype
         );
+        event.bannerFileId = result.fileId;
         event.bannerUrl = result.url;
         await event.save();
       } catch (imgError) {
@@ -186,18 +187,25 @@ const updateEvent = async (req, res, next) => {
     // Handle banner image upload if present
     if (req.file) {
       try {
-        // Delete old banner if exists
-        if (event.bannerUrl) {
-          await imageService.deleteEventBanner(event.bannerUrl);
-        }
-        
+        const oldBannerFileId = event.bannerFileId;
+
         // Process and save new banner
         const result = await imageService.processEventBanner(
           req.file.buffer,
           event._id.toString(),
           req.file.mimetype
         );
+        event.bannerFileId = result.fileId;
         event.bannerUrl = result.url;
+
+        // Delete old banner if exists (best-effort)
+        if (oldBannerFileId) {
+          try {
+            await imageService.deleteEventBannerByFileId(oldBannerFileId);
+          } catch (err) {
+            console.error('Error deleting old banner file:', err);
+          }
+        }
       } catch (imgError) {
         console.error('Error processing banner image:', imgError);
         // Don't fail the entire update if image processing fails
@@ -257,6 +265,15 @@ const deleteEvent = async (req, res, next) => {
         success: false,
         message: 'Not authorized to delete this event'
       });
+    }
+
+    // Delete banner from GridFS (best-effort)
+    if (event.bannerFileId) {
+      try {
+        await imageService.deleteEventBannerByFileId(event.bannerFileId);
+      } catch (err) {
+        console.error('Error deleting banner file:', err);
+      }
     }
 
     await event.deleteOne();
