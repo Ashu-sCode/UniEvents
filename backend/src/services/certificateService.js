@@ -1,24 +1,21 @@
 /**
  * Certificate Service
- * 
+ *
  * Handles automatic certificate generation for completed events.
- * Ensures idempotency - prevents duplicate certificate generation.
+ * - Stores PDFs in MongoDB GridFS (no filesystem writes)
+ * - Ensures idempotency (one certificate per user per event)
  */
 
-const path = require('path');
-const fs = require('fs').promises;
 const Certificate = require('../models/Certificate.model');
 const Event = require('../models/Event.model');
 const Attendance = require('../models/Attendance.model');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
-
-// Certificate storage directory
-const CERTIFICATES_DIR = path.join(__dirname, '../../uploads/certificates');
+const fileStorageService = require('./fileStorageService');
 
 /**
  * Generate certificates for all attendees of an event
  * Called automatically when event status changes to 'completed'
- * 
+ *
  * @param {string} eventId - MongoDB ObjectId of the event
  * @param {string} issuerId - MongoDB ObjectId of the organizer issuing certificates
  * @returns {Promise<Object>} Result with count of certificates generated
@@ -47,9 +44,6 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
       throw new Error('Certificates can only be generated for completed events');
     }
 
-    // Ensure certificates directory exists
-    await ensureCertificatesDirectory();
-
     // Get all attendees for this event
     const attendees = await Attendance.find({ eventId })
       .populate('userId', 'name email rollNumber department');
@@ -76,7 +70,7 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
           attendance.userId,
           issuerId
         );
-        
+
         if (result.created) {
           generated++;
         } else {
@@ -110,7 +104,7 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
 /**
  * Generate a single certificate for a user
  * Implements idempotency - skips if certificate already exists
- * 
+ *
  * @param {Object} event - Event document
  * @param {Object} user - User document
  * @param {string} issuerId - Issuer's user ID
@@ -131,17 +125,12 @@ const generateSingleCertificate = async (event, user, issuerId) => {
     };
   }
 
-  // Create certificate record first (to get certificate ID)
+  // Create certificate record first (to get certificateId)
   const certificate = new Certificate({
     eventId: event._id,
     userId: user._id,
     issuedBy: issuerId
   });
-
-  // Generate filename
-  const filename = `CERT-${event._id}-${user._id}.pdf`;
-  const filePath = path.join(CERTIFICATES_DIR, filename);
-  const relativeFilePath = `/uploads/certificates/${filename}`;
 
   // Prepare certificate data for PDF generation
   const certificateData = {
@@ -155,11 +144,24 @@ const generateSingleCertificate = async (event, user, issuerId) => {
   // Generate PDF
   const pdfBuffer = await generateCertificatePDF(certificateData);
 
-  // Save PDF to disk
-  await fs.writeFile(filePath, pdfBuffer);
+  // Store PDF in GridFS
+  const filename = `certificate-${certificate.certificateId}.pdf`;
+  const { fileId } = await fileStorageService.saveBuffer({
+    bucket: 'certificates',
+    filename,
+    contentType: 'application/pdf',
+    buffer: pdfBuffer,
+    metadata: {
+      kind: 'certificate',
+      eventId: event._id.toString(),
+      userId: user._id.toString(),
+      certificateId: certificate.certificateId
+    }
+  });
 
-  // Update certificate with file path
-  certificate.filePath = relativeFilePath;
+  // Persist GridFS reference (no local filePath)
+  certificate.pdfFileId = fileId;
+  certificate.filePath = null;
   await certificate.save();
 
   console.log(`[CertificateService] Generated certificate for: ${user.name}`);
@@ -171,8 +173,8 @@ const generateSingleCertificate = async (event, user, issuerId) => {
 };
 
 /**
- * Get certificate by ID with file path
- * 
+ * Get certificate by ID
+ *
  * @param {string} certificateId - Certificate ID (CERT-XXXX format)
  * @returns {Promise<Object|null>} Certificate document or null
  */
@@ -185,7 +187,7 @@ const getCertificateById = async (certificateId) => {
 
 /**
  * Get all certificates for a user
- * 
+ *
  * @param {string} userId - User's MongoDB ObjectId
  * @returns {Promise<Array>} Array of certificate documents
  */
@@ -198,7 +200,7 @@ const getUserCertificates = async (userId) => {
 
 /**
  * Get all certificates for an event
- * 
+ *
  * @param {string} eventId - Event's MongoDB ObjectId
  * @returns {Promise<Array>} Array of certificate documents
  */
@@ -210,7 +212,7 @@ const getEventCertificates = async (eventId) => {
 
 /**
  * Get certificate statistics for an event
- * 
+ *
  * @param {string} eventId - Event's MongoDB ObjectId
  * @returns {Promise<Object>} Statistics object
  */
@@ -227,37 +229,11 @@ const getCertificateStats = async (eventId) => {
   };
 };
 
-/**
- * Ensure certificates directory exists
- */
-const ensureCertificatesDirectory = async () => {
-  try {
-    await fs.access(CERTIFICATES_DIR);
-  } catch {
-    await fs.mkdir(CERTIFICATES_DIR, { recursive: true });
-  }
-};
-
-/**
- * Get full file path for a certificate
- * 
- * @param {string} certificateId - Certificate ID
- * @returns {Promise<string|null>} Full file path or null
- */
-const getCertificateFilePath = async (certificateId) => {
-  const certificate = await Certificate.findOne({ certificateId });
-  if (!certificate || !certificate.filePath) {
-    return null;
-  }
-  return path.join(__dirname, '../..', certificate.filePath);
-};
-
 module.exports = {
   generateCertificatesForEvent,
   generateSingleCertificate,
   getCertificateById,
   getUserCertificates,
   getEventCertificates,
-  getCertificateStats,
-  getCertificateFilePath
+  getCertificateStats
 };

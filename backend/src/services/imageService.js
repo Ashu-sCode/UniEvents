@@ -1,15 +1,15 @@
 /**
  * Image Service
- * 
+ *
  * Handles image processing for event banners.
  * - Resizes images to optimal width
  * - Converts to WebP format for better compression
- * - Validates file types and sizes
+ * - Stores output in MongoDB GridFS (no local filesystem writes)
  */
 
 const sharp = require('sharp');
-const path = require('path');
-const fs = require('fs').promises;
+const mongoose = require('mongoose');
+const fileStorageService = require('./fileStorageService');
 
 // Configuration
 const CONFIG = {
@@ -20,16 +20,13 @@ const CONFIG = {
   outputFormat: 'webp'
 };
 
-// Banner storage directory
-const BANNERS_DIR = path.join(__dirname, '../../uploads/event-banners');
-
 /**
- * Process and save an event banner image
- * 
+ * Process and save an event banner image to GridFS
+ *
  * @param {Buffer} imageBuffer - Raw image buffer from upload
- * @param {string} eventId - Event ID for filename
+ * @param {string} eventId - Event ID
  * @param {string} originalMimetype - Original file mimetype
- * @returns {Promise<Object>} Result with file path and metadata
+ * @returns {Promise<Object>} Result with fileId + URL + metadata
  */
 const processEventBanner = async (imageBuffer, eventId, originalMimetype) => {
   try {
@@ -37,15 +34,6 @@ const processEventBanner = async (imageBuffer, eventId, originalMimetype) => {
     if (!CONFIG.allowedTypes.includes(originalMimetype)) {
       throw new Error(`Invalid file type. Allowed: ${CONFIG.allowedTypes.join(', ')}`);
     }
-
-    // Ensure directory exists
-    await ensureBannersDirectory();
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const filename = `banner-${eventId}-${timestamp}.webp`;
-    const filePath = path.join(BANNERS_DIR, filename);
-    const relativeUrl = `/uploads/event-banners/${filename}`;
 
     // Process image with Sharp
     const processedBuffer = await sharp(imageBuffer)
@@ -59,14 +47,28 @@ const processEventBanner = async (imageBuffer, eventId, originalMimetype) => {
     // Get metadata
     const metadata = await sharp(processedBuffer).metadata();
 
-    // Save to disk
-    await fs.writeFile(filePath, processedBuffer);
+    // Upload to GridFS
+    const filename = `banner-${eventId}-${Date.now()}.webp`;
+    const { fileId } = await fileStorageService.saveBuffer({
+      bucket: 'event-banners',
+      filename,
+      contentType: 'image/webp',
+      buffer: processedBuffer,
+      metadata: {
+        kind: 'event-banner',
+        eventId: eventId,
+        originalMimetype,
+        width: metadata.width,
+        height: metadata.height
+      }
+    });
 
-    console.log(`[ImageService] Processed banner: ${filename} (${metadata.width}x${metadata.height})`);
+    console.log(`[ImageService] Stored banner in GridFS: ${filename} (${metadata.width}x${metadata.height})`);
 
     return {
       success: true,
-      url: relativeUrl,
+      fileId,
+      url: `/api/files/event-banners/${fileId.toString()}`,
       filename,
       width: metadata.width,
       height: metadata.height,
@@ -79,33 +81,30 @@ const processEventBanner = async (imageBuffer, eventId, originalMimetype) => {
 };
 
 /**
- * Delete an event banner
- * 
- * @param {string} bannerUrl - Relative URL of the banner to delete
- * @returns {Promise<boolean>} True if deleted, false if not found
+ * Delete an event banner from GridFS
+ *
+ * @param {string|mongoose.Types.ObjectId} fileId
+ * @returns {Promise<boolean>} True if deleted, false if missing/invalid
  */
-const deleteEventBanner = async (bannerUrl) => {
+const deleteEventBannerByFileId = async (fileId) => {
   try {
-    if (!bannerUrl) return false;
+    if (!fileId) return false;
 
-    const filename = path.basename(bannerUrl);
-    const filePath = path.join(BANNERS_DIR, filename);
+    const objectId = typeof fileId === 'string' ? new mongoose.Types.ObjectId(fileId) : fileId;
+    if (!mongoose.Types.ObjectId.isValid(objectId)) return false;
 
-    await fs.unlink(filePath);
-    console.log(`[ImageService] Deleted banner: ${filename}`);
+    await fileStorageService.deleteFile({ bucket: 'event-banners', fileId: objectId });
     return true;
   } catch (error) {
-    if (error.code === 'ENOENT') {
-      console.log(`[ImageService] Banner not found: ${bannerUrl}`);
-      return false;
-    }
+    // GridFS delete throws if not found; treat as non-fatal for cleanup paths
+    if (error?.message?.includes('FileNotFound')) return false;
     throw error;
   }
 };
 
 /**
  * Validate image before processing
- * 
+ *
  * @param {Object} file - Multer file object
  * @returns {Object} Validation result
  */
@@ -136,8 +135,8 @@ const validateImage = (file) => {
 
 /**
  * Get image metadata
- * 
- * @param {Buffer|string} image - Image buffer or file path
+ *
+ * @param {Buffer|string} image - Image buffer
  * @returns {Promise<Object>} Image metadata
  */
 const getImageMetadata = async (image) => {
@@ -156,19 +155,8 @@ const getImageMetadata = async (image) => {
 };
 
 /**
- * Ensure banners directory exists
- */
-const ensureBannersDirectory = async () => {
-  try {
-    await fs.access(BANNERS_DIR);
-  } catch {
-    await fs.mkdir(BANNERS_DIR, { recursive: true });
-  }
-};
-
-/**
  * Generate a thumbnail for preview
- * 
+ *
  * @param {Buffer} imageBuffer - Original image buffer
  * @param {number} width - Thumbnail width
  * @returns {Promise<Buffer>} Thumbnail buffer
@@ -182,7 +170,7 @@ const generateThumbnail = async (imageBuffer, width = 400) => {
 
 module.exports = {
   processEventBanner,
-  deleteEventBanner,
+  deleteEventBannerByFileId,
   validateImage,
   getImageMetadata,
   generateThumbnail,

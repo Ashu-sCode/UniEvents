@@ -79,6 +79,10 @@ const eventSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  bannerFileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null
+  },
   enableCertificates: {
     type: Boolean,
     default: false  // Enable certificate generation for workshops

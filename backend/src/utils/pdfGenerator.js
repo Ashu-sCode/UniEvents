@@ -9,231 +9,298 @@ const PDFDocument = require('pdfkit');
 const { generateQRCodeBuffer } = require('./qrGenerator');
 
 /**
- * Generate a modern, two-column ticket PDF
- * Compact mobile-friendly size with premium design
- * 
+ * Generate a ticket PDF that matches the provided reference layout/structure,
+ * using UniEvent's black/white/gray theme only.
+ *
  * @param {Object} ticket - Populated ticket document
  * @returns {Promise<Buffer>} PDF buffer
- * 
- * Ticket Layout:
- * ┌─────────────────────────────────────┐
- * │  ░░░░░ GRADIENT HEADER ░░░░░        │
- * │  UniEvent • Event Ticket            │
- * │  ═══════════════════════════════    │
- * │  EVENT NAME (large)                 │
- * ├─────────────────────────────────────┤
- * │  LEFT COLUMN    │    RIGHT COLUMN   │
- * │  Date           │    ┌─────────┐    │
- * │  Time           │    │ QR CODE │    │
- * │  Venue          │    │         │    │
- * │  ─────────────  │    └─────────┘    │
- * │  Attendee Name  │                   │
- * │  Department     │                   │
- * ├─────────────────────────────────────┤
- * │  TICKET ID      Show at entry       │
- * └─────────────────────────────────────┘
  */
 const generateTicketPDF = async (ticket) => {
   return new Promise(async (resolve, reject) => {
     try {
-      // Wider ticket for two-column layout
-      const width = 340;
-      const height = 380;
-      
+      // === Canvas (fixed geometry) ===
+      const pageWidth = 350;
+      const pageHeight = 700;
+
+      const PADDING = 24;
+      const HEADER_HEIGHT = Math.round(pageHeight * 0.55); // top black section
+      const FOOTER_START = HEADER_HEIGHT + 40;
+
       const doc = new PDFDocument({
-        size: [width, height],
+        size: [pageWidth, pageHeight],
         margin: 0,
         bufferPages: true,
         autoFirstPage: true,
       });
 
       const chunks = [];
-      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      const event = ticket.eventId;
-      const user = ticket.userId;
+      const event = ticket?.eventId || {};
+      const user = ticket?.userId || {};
 
-      // Colors - premium neutral palette
-      const headerBg = '#171717';     // neutral-900
-      const cardBg = '#ffffff';
-      const textPrimary = '#171717';  // neutral-900
-      const textSecondary = '#525252'; // neutral-600
-      const textMuted = '#a3a3a3';    // neutral-400
-      const borderColor = '#e5e5e5';  // neutral-200
-      const accentBg = '#f5f5f5';     // neutral-100
+      // Only allowed colors
+      const COLORS = {
+        BLACK: '#111111',
+        DARK: '#111111',
+        WHITE: '#FFFFFF',
+        GRAY: '#E5E5E5',
+      };
 
-      // === ROUNDED CONTAINER BORDER ===
-      doc.roundedRect(0, 0, width, height, 16)
-         .fillColor(cardBg)
-         .fill();
+      // Data mapping (no DB/schema changes; fall back to ticketId if needed)
+      const ticketName = ticket?.ticketName || 'TICKET NAME';
+      const eventName = event?.title || 'EVENT NAME';
+      const attendeeName = user?.name || 'YOUR NAME';
+      const code = ticket?.code || ticket?.ticketId || 'CODE';
 
-      // === HEADER SECTION (dark with subtle gradient effect) ===
+      // QR payload: can be a verification URL if configured, otherwise a bare code
+      // NOTE: scanner currently expects ticketId; keep base unset unless your scanner extracts ticketId from URL.
+      const verificationBase = process.env.TICKET_VERIFICATION_URL_BASE;
+      const qrValue = verificationBase
+        ? `${verificationBase}${verificationBase.includes('?') ? '&' : '?'}ticketId=${encodeURIComponent(code)}`
+        : code;
+
+      const eventDate = new Date(event?.date);
+      const dateStr = isNaN(eventDate.getTime())
+        ? '-'
+        : eventDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+
+      const descriptionRaw = String(event?.description || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const description = descriptionRaw
+        ? descriptionRaw
+        : 'Entry valid for one person. Please arrive early for a smooth check-in.';
+
+      // === Base container ===
+      const radius = 24;
+      doc.roundedRect(0, 0, pageWidth, pageHeight, radius)
+        .fillColor(COLORS.WHITE)
+        .fill();
+      doc.roundedRect(0.5, 0.5, pageWidth - 1, pageHeight - 1, radius)
+        .lineWidth(1)
+        .strokeColor(COLORS.GRAY)
+        .stroke();
+
+      // === Top Header Area ===
       doc.save();
-      doc.roundedRect(0, 0, width, 85, 16)
-         .clip();
-      doc.rect(0, 0, width, 85).fill(headerBg);
-      // Add subtle lighter strip at top for gradient effect
-      doc.rect(0, 0, width, 2).fill('#262626');
+      doc.roundedRect(0, 0, pageWidth, HEADER_HEIGHT, radius).clip();
+      doc.rect(0, 0, pageWidth, HEADER_HEIGHT).fillColor(COLORS.DARK).fill();
+
+      // Top-center semicircle cut-out (radius 14)
+      doc.circle(pageWidth / 2, 0, 14).fillColor(COLORS.WHITE).fill();
       doc.restore();
 
-      // Brand text
-      doc.fillColor(textMuted)
-         .fontSize(9)
-         .font('Helvetica')
-         .text('UNIEVENT', 0, 18, { width, align: 'center' });
+      // 1) QR CONTAINER (white rounded square 120x120, centered)
+      const qrSize = 120;
+      const qrX = Math.round((pageWidth - qrSize) / 2);
+      const qrY = 20; // margin-top 20
 
-      doc.fillColor('#737373')
-         .fontSize(7)
-         .text('Event Ticket', 0, 30, { width, align: 'center' });
+      doc.roundedRect(qrX, qrY, qrSize, qrSize, 18)
+        .fillColor(COLORS.WHITE)
+        .fill();
 
-      // Event Title
-      doc.fillColor('#ffffff')
-         .fontSize(14)
-         .font('Helvetica-Bold')
-         .text(event.title, 20, 48, { 
-           width: width - 40, 
-           align: 'center',
-           lineGap: 2,
-           height: 28,
-           ellipsis: true
-         });
+      // QR inside with padding 10
+      const qrBuffer = await generateQRCodeBuffer(qrValue);
+      doc.image(qrBuffer, qrX + 10, qrY + 10, { width: qrSize - 20, height: qrSize - 20 });
 
-      // === TWO-COLUMN CONTENT SECTION ===
-      const contentY = 100;
-      const leftColX = 20;
-      const leftColWidth = 170;
-      const rightColX = 200;
-      const qrSize = 110;
+      // 2) Text under QR: SCAN HERE (font size 9)
+      const scanY = qrY + qrSize + 10;
+      doc.fillColor(COLORS.GRAY)
+        .font('Helvetica')
+        .fontSize(9)
+        .text('SCAN HERE', 0, scanY, { width: pageWidth, align: 'center' });
 
-      // Format date
-      const eventDate = new Date(event.date);
-      const dateStr = eventDate.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
+      // 3) Big bold: TICKET NAME (font size 20)
+      const ticketTitleY = scanY + 16;
+      doc.fillColor(COLORS.WHITE)
+        .font('Helvetica-Bold')
+        .fontSize(20)
+        .text(ticketName, PADDING, ticketTitleY, {
+          width: pageWidth - PADDING * 2,
+          align: 'center',
+          ellipsis: true,
+        });
+
+      // 4) Smaller: EVENT NAME (font size 12)
+      const eventTitleY = ticketTitleY + 26;
+      doc.fillColor(COLORS.GRAY)
+        .font('Helvetica-Bold')
+        .fontSize(12)
+        .text(eventName, PADDING, eventTitleY, {
+          width: pageWidth - PADDING * 2,
+          align: 'center',
+          ellipsis: true,
+        });
+
+      // 5) DETAILS BOX (gray capsule, width 75% of ticket, radius 18)
+      const detailBoxW = Math.round(pageWidth * 0.75);
+      const detailBoxX = Math.round((pageWidth - detailBoxW) / 2);
+      const detailBoxY = eventTitleY + 24;
+      const detailPadX = 12;
+      const detailPadY = 10;
+
+      // Measure body height (auto), but cap to keep layout stable
+      doc.font('Helvetica-Bold').fontSize(8);
+      const titleH = doc.heightOfString('DETAILS INFORMATION', {
+        width: detailBoxW - detailPadX * 2,
+        align: 'center'
       });
 
-      let yPos = contentY;
+      doc.font('Helvetica').fontSize(8);
+      const bodyHRaw = doc.heightOfString(description, {
+        width: detailBoxW - detailPadX * 2,
+        align: 'center'
+      });
+      const bodyH = Math.min(bodyHRaw, 34);
 
-      // --- LEFT COLUMN: Event Details ---
-      // Date
-      doc.fillColor(textMuted)
-         .fontSize(7)
-         .font('Helvetica')
-         .text('DATE', leftColX, yPos);
-      doc.fillColor(textPrimary)
-         .fontSize(10)
-         .font('Helvetica-Bold')
-         .text(dateStr, leftColX, yPos + 10);
+      const detailBoxH = detailPadY + titleH + 6 + bodyH + detailPadY;
 
-      yPos += 32;
+      doc.roundedRect(detailBoxX, detailBoxY, detailBoxW, detailBoxH, 18)
+        .fillColor(COLORS.GRAY)
+        .fill();
 
-      // Time
-      doc.fillColor(textMuted)
-         .fontSize(7)
-         .font('Helvetica')
-         .text('TIME', leftColX, yPos);
-      doc.fillColor(textPrimary)
-         .fontSize(10)
-         .font('Helvetica-Bold')
-         .text(event.time, leftColX, yPos + 10);
+      doc.fillColor(COLORS.DARK)
+        .font('Helvetica-Bold')
+        .fontSize(8)
+        .text('DETAILS INFORMATION', detailBoxX + detailPadX, detailBoxY + detailPadY, {
+          width: detailBoxW - detailPadX * 2,
+          align: 'center',
+          ellipsis: true,
+        });
 
-      yPos += 32;
+      doc.fillColor(COLORS.DARK)
+        .font('Helvetica')
+        .fontSize(8)
+        .text(description, detailBoxX + detailPadX, detailBoxY + detailPadY + titleH + 6, {
+          width: detailBoxW - detailPadX * 2,
+          align: 'center',
+          height: bodyH,
+          ellipsis: true,
+        });
 
-      // Venue
-      doc.fillColor(textMuted)
-         .fontSize(7)
-         .font('Helvetica')
-         .text('VENUE', leftColX, yPos);
-      doc.fillColor(textPrimary)
-         .fontSize(9)
-         .font('Helvetica-Bold')
-         .text(event.venue, leftColX, yPos + 10, { 
-           width: leftColWidth,
-           height: 24,
-           ellipsis: true
-         });
+      // 6) Two lines: NAME <username> / CODE <ticket.code>
+      const nameCodeY = detailBoxY + detailBoxH + 14;
 
-      yPos += 42;
+      doc.fillColor(COLORS.WHITE)
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(`NAME  ${attendeeName}`, PADDING, nameCodeY, {
+          width: pageWidth - PADDING * 2,
+          align: 'center',
+          ellipsis: true,
+        });
 
-      // Divider line
-      doc.strokeColor(borderColor)
-         .lineWidth(1)
-         .moveTo(leftColX, yPos)
-         .lineTo(leftColX + leftColWidth - 10, yPos)
-         .stroke();
+      doc.fillColor(COLORS.WHITE)
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(`CODE  ${code}`, PADDING, nameCodeY + 18, {
+          width: pageWidth - PADDING * 2,
+          align: 'center',
+          ellipsis: true,
+        });
 
-      yPos += 15;
+      // === Perforation line ===
+      const perforationY = HEADER_HEIGHT;
 
-      // Attendee Name
-      doc.fillColor(textMuted)
-         .fontSize(7)
-         .font('Helvetica')
-         .text('ATTENDEE', leftColX, yPos);
-      doc.fillColor(textPrimary)
-         .fontSize(11)
-         .font('Helvetica-Bold')
-         .text(user.name, leftColX, yPos + 10);
+      // Half-circle cut effect on both sides
+      doc.circle(0, perforationY, 16).fillColor(COLORS.WHITE).fill();
+      doc.circle(pageWidth, perforationY, 16).fillColor(COLORS.WHITE).fill();
 
-      yPos += 32;
+      doc.strokeColor(COLORS.GRAY)
+        .lineWidth(1)
+        .dash(6, { space: 5 })
+        .moveTo(PADDING, perforationY)
+        .lineTo(pageWidth - PADDING, perforationY)
+        .stroke()
+        .undash();
 
-      // Department & Roll Number
-      const deptText = user.rollNumber 
-        ? `${user.rollNumber} • ${user.department}`
-        : user.department;
-      doc.fillColor(textSecondary)
-         .fontSize(8)
-         .font('Helvetica')
-         .text(deptText, leftColX, yPos, { width: leftColWidth });
+      // === Bottom White Section (centered stack) ===
+      const bottomTitleY = FOOTER_START;
 
-      // --- RIGHT COLUMN: QR Code ---
-      const qrY = contentY + 15;
-      const qrX = rightColX;
+      doc.fillColor(COLORS.BLACK)
+        .font('Helvetica-Bold')
+        .fontSize(16)
+        .text(ticketName, PADDING, bottomTitleY, {
+          width: pageWidth - PADDING * 2,
+          align: 'center',
+          ellipsis: true,
+        });
 
-      // QR background with rounded corners
-      doc.roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 12)
-         .fillColor(accentBg)
-         .fill();
+      doc.fillColor(COLORS.DARK)
+        .font('Helvetica')
+        .fontSize(12)
+        .text(eventName, PADDING, bottomTitleY + 22, {
+          width: pageWidth - PADDING * 2,
+          align: 'center',
+          ellipsis: true,
+        });
 
-      // QR border
-      doc.roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 12)
-         .strokeColor(borderColor)
-         .lineWidth(1)
-         .stroke();
+      doc.fillColor(COLORS.DARK)
+        .font('Helvetica-Bold')
+        .fontSize(12)
+        .text(attendeeName, PADDING, bottomTitleY + 44, {
+          width: pageWidth - PADDING * 2,
+          align: 'center',
+          ellipsis: true,
+        });
 
-      // QR Code
-      const qrBuffer = await generateQRCodeBuffer(ticket.ticketId);
-      doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+      // === Barcode (centered near bottom, width 80%) ===
+      const barcodeW = Math.round(pageWidth * 0.8);
+      const barcodeH = 54;
+      const barcodeX = Math.round((pageWidth - barcodeW) / 2);
+      const barcodeY = pageHeight - 110;
 
-      // === FOOTER SECTION ===
-      const footerY = height - 55;
+      // Keep existing barcode generation logic (vector bars, deterministic)
+      const drawBarcode = (value) => {
+        let state = 0;
+        for (const ch of String(value)) {
+          state = (state * 31 + ch.charCodeAt(0)) >>> 0;
+        }
 
-      // Tear-off dotted line with notches
-      doc.circle(-6, footerY, 10).fill(accentBg);
-      doc.circle(width + 6, footerY, 10).fill(accentBg);
-      
-      doc.strokeColor(borderColor)
-         .lineWidth(1)
-         .dash(5, { space: 4 })
-         .moveTo(15, footerY)
-         .lineTo(width - 15, footerY)
-         .stroke()
-         .undash();
+        const next = () => {
+          state ^= state << 13;
+          state >>>= 0;
+          state ^= state >>> 17;
+          state >>>= 0;
+          state ^= state << 5;
+          state >>>= 0;
+          return state;
+        };
 
-      // Ticket ID (left)
-      doc.fillColor(textPrimary)
-         .fontSize(9)
-         .font('Helvetica-Bold')
-         .text(ticket.ticketId, 20, footerY + 18);
+        let x = barcodeX + 10;
+        const maxX = barcodeX + barcodeW - 10;
 
-      // Footer note (right)
-      doc.fillColor(textMuted)
-         .fontSize(8)
-         .font('Helvetica')
-         .text('Show this ticket at entry', width - 140, footerY + 18);
+        doc.fillColor(COLORS.BLACK);
+        while (x < maxX) {
+          const r = next();
+          const isBar = (r & 1) === 1;
+          const w = 1 + (r % 3); // 1..3
+          if (isBar) {
+            doc.rect(x, barcodeY + 10, w, barcodeH - 20).fill();
+          }
+          x += w;
+        }
+      };
+
+      drawBarcode(code);
+
+      // Numeric string under barcode (deterministic)
+      let hash = 0;
+      for (const ch of String(code)) hash = (hash * 33 + ch.charCodeAt(0)) % 1000000;
+      const numeric = String(hash).padStart(10, '0').slice(0, 10);
+
+      doc.fillColor(COLORS.DARK)
+        .font('Helvetica')
+        .fontSize(8)
+        .text(numeric, 0, barcodeY + barcodeH + 6, { width: pageWidth, align: 'center' });
 
       doc.end();
     } catch (error) {

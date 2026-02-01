@@ -1,12 +1,12 @@
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
 
 const authRoutes = require("./routes/auth.routes");
 const eventRoutes = require("./routes/event.routes");
 const ticketRoutes = require("./routes/ticket.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
 const certificateRoutes = require("./routes/certificate.routes");
+const fileRoutes = require("./routes/file.routes");
 
 const errorHandler = require("./middleware/errorHandler");
 
@@ -48,11 +48,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   STATIC FILES
-========================= */
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
-
-/* =========================
    HEALTH CHECK
 ========================= */
 app.get("/api/health", (req, res) => {
@@ -70,6 +65,7 @@ app.use("/api/events", eventRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/certificates", certificateRoutes);
+app.use("/api/files", fileRoutes);
 
 /* =========================
    404 HANDLER

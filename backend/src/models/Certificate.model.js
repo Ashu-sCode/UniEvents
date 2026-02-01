@@ -38,9 +38,13 @@ const certificateSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  pdfFileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null
+  },
   filePath: {
     type: String,
-    default: null  // Local file path for stored PDF
+    default: null  // Deprecated: previously used for local filesystem storage
   }
 }, {
   timestamps: true
