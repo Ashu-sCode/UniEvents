@@ -3,15 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  rollNumber?: string;
-  department: string;
-  role: 'student' | 'organizer';
-}
+import type { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +13,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (data: SignupData) => Promise<void>;
   logout: () => void;
+  /** Update cached user in state + localStorage (used by Profile module). */
+  updateUser: (user: User) => void;
 }
 
 interface SignupData {
@@ -89,6 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUser = (nextUser: User) => {
+    setUser(nextUser);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -108,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         signup,
         logout,
+        updateUser,
       }}
     >
       {children}
