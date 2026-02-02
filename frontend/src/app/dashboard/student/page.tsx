@@ -1,19 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { eventsAPI, ticketsAPI, certificatesAPI } from '@/lib/api';
 import { formatDate, getStatusColor, downloadBlob, getImageUrl } from '@/lib/utils';
 import {
   Calendar, Ticket, Award, LogOut,
-  MapPin, Clock, Users, Download, FileText, Eye, ChevronRight
+  MapPin, Clock, Users, Download, FileText, Eye, ChevronRight, UserCircle
 } from 'lucide-react';
 import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
 
 export default function StudentDashboard() {
+  const router = useRouter();
   const { user, logout } = useAuth();
   const toast = useToast();
   const [events, setEvents] = useState<Event[]>([]);
@@ -128,6 +130,14 @@ export default function StudentDashboard() {
                 <strong className="text-neutral-900">{user?.name}</strong>
               </span>
               <button
+                onClick={() => router.push('/dashboard/student/profile')}
+                className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-700"
+                aria-label="Profile"
+                title="Profile"
+              >
+                <UserCircle className="h-5 w-5" />
+              </button>
+              <button
                 onClick={logout}
                 className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
               >
@@ -166,7 +176,7 @@ export default function StudentDashboard() {
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-3 mb-8">
+        <div className="flex flex-wrap gap-3 mb-8">
           <button
             onClick={() => setActiveTab('events')}
             className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
