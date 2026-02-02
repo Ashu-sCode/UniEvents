@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { eventsAPI, ticketsAPI } from '@/lib/api';
@@ -9,7 +10,7 @@ import {
   Calendar, Ticket, Users, LogOut, Plus,
   QrCode, CheckCircle, XCircle,
   BarChart3, Eye, Camera, Keyboard, Award, Upload, X,
-  Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin
+  Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin, UserCircle
 } from 'lucide-react';
 import type { Event } from '@/types';
 import CameraScan from '@/components/CameraScan';
@@ -17,6 +18,7 @@ import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 export default function OrganizerDashboard() {
+  const router = useRouter();
   const { user, logout } = useAuth();
   const toast = useToast();
   const [events, setEvents] = useState<Event[]>([]);
@@ -101,6 +103,14 @@ export default function OrganizerDashboard() {
               <span className="text-sm text-neutral-600">
                 <strong className="text-neutral-900">{user?.name}</strong> • {user?.department}
               </span>
+              <button
+                onClick={() => router.push('/dashboard/organizer/profile')}
+                className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-700"
+                aria-label="Profile"
+                title="Profile"
+              >
+                <UserCircle className="h-5 w-5" />
+              </button>
               <button
                 onClick={logout}
                 className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
