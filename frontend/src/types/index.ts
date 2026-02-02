@@ -5,7 +5,10 @@ export interface User {
   email: string;
   rollNumber?: string;
   department: string;
+  phone?: string | null;
+  profilePhotoUrl?: string | null;
   role: 'student' | 'organizer';
+  createdAt?: string;
 }
 
 // Event types

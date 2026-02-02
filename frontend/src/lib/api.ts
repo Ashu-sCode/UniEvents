@@ -129,3 +129,15 @@ export const certificatesAPI = {
   getEventCertificates: (eventId: string) => 
     api.get(`/certificates/event/${eventId}`),
 };
+
+export const usersAPI = {
+  getMe: () => api.get('/users/me'),
+  updateMe: (data: FormData | any) => {
+    if (data instanceof FormData) {
+      return api.put('/users/me', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    }
+    return api.put('/users/me', data);
+  },
+};
