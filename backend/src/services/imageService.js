@@ -20,6 +20,12 @@ const CONFIG = {
   outputFormat: 'webp'
 };
 
+const PROFILE_PHOTO_CONFIG = {
+  maxWidth: 512,
+  quality: 82,
+  outputFormat: 'webp'
+};
+
 /**
  * Process and save an event banner image to GridFS
  *
@@ -76,6 +82,82 @@ const processEventBanner = async (imageBuffer, eventId, originalMimetype) => {
     };
   } catch (error) {
     console.error('[ImageService] Error processing banner:', error);
+    throw error;
+  }
+};
+
+/**
+ * Process and save a profile photo image to GridFS
+ *
+ * @param {Buffer} imageBuffer - Raw image buffer from upload
+ * @param {string} userId - User ID
+ * @param {string} originalMimetype - Original file mimetype
+ * @returns {Promise<Object>} Result with fileId + URL + metadata
+ */
+const processProfilePhoto = async (imageBuffer, userId, originalMimetype) => {
+  try {
+    if (!CONFIG.allowedTypes.includes(originalMimetype)) {
+      throw new Error(`Invalid file type. Allowed: ${CONFIG.allowedTypes.join(', ')}`);
+    }
+
+    // Make it square-ish: fit cover into 512x512
+    const processedBuffer = await sharp(imageBuffer)
+      .resize(PROFILE_PHOTO_CONFIG.maxWidth, PROFILE_PHOTO_CONFIG.maxWidth, {
+        fit: 'cover',
+        position: 'centre'
+      })
+      .webp({ quality: PROFILE_PHOTO_CONFIG.quality })
+      .toBuffer();
+
+    const metadata = await sharp(processedBuffer).metadata();
+
+    const filename = `profile-${userId}-${Date.now()}.webp`;
+    const { fileId } = await fileStorageService.saveBuffer({
+      bucket: 'profile-photos',
+      filename,
+      contentType: 'image/webp',
+      buffer: processedBuffer,
+      metadata: {
+        kind: 'profile-photo',
+        userId,
+        originalMimetype,
+        width: metadata.width,
+        height: metadata.height
+      }
+    });
+
+    return {
+      success: true,
+      fileId,
+      url: `/api/files/profile-photos/${fileId.toString()}`,
+      filename,
+      width: metadata.width,
+      height: metadata.height,
+      size: processedBuffer.length
+    };
+  } catch (error) {
+    console.error('[ImageService] Error processing profile photo:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a profile photo from GridFS
+ *
+ * @param {string|mongoose.Types.ObjectId} fileId
+ * @returns {Promise<boolean>} True if deleted, false if missing/invalid
+ */
+const deleteProfilePhotoByFileId = async (fileId) => {
+  try {
+    if (!fileId) return false;
+
+    const objectId = typeof fileId === 'string' ? new mongoose.Types.ObjectId(fileId) : fileId;
+    if (!mongoose.Types.ObjectId.isValid(objectId)) return false;
+
+    await fileStorageService.deleteFile({ bucket: 'profile-photos', fileId: objectId });
+    return true;
+  } catch (error) {
+    if (error?.message?.includes('FileNotFound')) return false;
     throw error;
   }
 };
@@ -171,6 +253,8 @@ const generateThumbnail = async (imageBuffer, width = 400) => {
 module.exports = {
   processEventBanner,
   deleteEventBannerByFileId,
+  processProfilePhoto,
+  deleteProfilePhotoByFileId,
   validateImage,
   getImageMetadata,
   generateThumbnail,

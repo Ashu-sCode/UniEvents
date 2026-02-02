@@ -6,7 +6,7 @@
 const mongoose = require('mongoose');
 const fileStorageService = require('../services/fileStorageService');
 
-const ALLOWED_BUCKETS = new Set(['event-banners', 'certificates']);
+const ALLOWED_BUCKETS = new Set(['event-banners', 'profile-photos', 'certificates']);
 
 const streamFile = async (req, res, next) => {
   try {

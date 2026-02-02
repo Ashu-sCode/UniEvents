@@ -44,6 +44,19 @@ const userSchema = new mongoose.Schema({
     enum: Object.values(roles),
     default: roles.STUDENT
   },
+  phone: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  profilePhotoUrl: {
+    type: String,
+    default: null
+  },
+  profilePhotoFileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null
+  },
   idCardUrl: {
     type: String,
     default: null
@@ -98,7 +111,10 @@ userSchema.methods.toPublicJSON = function() {
     email: this.email,
     rollNumber: this.rollNumber,
     department: this.department,
-    role: this.role
+    phone: this.phone,
+    profilePhotoUrl: this.profilePhotoUrl,
+    role: this.role,
+    createdAt: this.createdAt
   };
 };
 

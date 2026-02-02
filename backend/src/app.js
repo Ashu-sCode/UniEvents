@@ -7,6 +7,7 @@ const ticketRoutes = require("./routes/ticket.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
 const certificateRoutes = require("./routes/certificate.routes");
 const fileRoutes = require("./routes/file.routes");
+const userRoutes = require("./routes/user.routes");
 
 const errorHandler = require("./middleware/errorHandler");
 
@@ -66,6 +67,7 @@ app.use("/api/tickets", ticketRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/certificates", certificateRoutes);
 app.use("/api/files", fileRoutes);
+app.use("/api/users", userRoutes);
 
 /* =========================
    404 HANDLER

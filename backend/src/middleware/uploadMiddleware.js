@@ -30,6 +30,16 @@ const eventBannerUpload = multer({
   }
 });
 
+// Configure multer for profile photo uploads
+const profilePhotoUpload = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 3 * 1024 * 1024, // 3MB max
+    files: 1
+  }
+});
+
 // Configure multer for generic image uploads
 const genericImageUpload = multer({
   storage,
@@ -101,6 +111,7 @@ const uploadBannerOptional = [
 
 module.exports = {
   eventBannerUpload,
+  profilePhotoUpload,
   genericImageUpload,
   handleUploadError,
   uploadBanner,
