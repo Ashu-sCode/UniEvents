@@ -65,3 +65,37 @@ export function StatCardSkeleton() {
     </div>
   );
 }
+
+export function ProfileFormSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6 sm:p-8">
+      <Skeleton className="h-6 w-28 mb-2" />
+      <Skeleton className="h-4 w-56 mb-8" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div>
+          <Skeleton className="h-4 w-20 mb-2" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+        <div>
+          <Skeleton className="h-4 w-24 mb-2" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+        <div>
+          <Skeleton className="h-4 w-28 mb-2" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+        <div>
+          <Skeleton className="h-4 w-40 mb-2" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+        <div>
+          <Skeleton className="h-4 w-32 mb-2" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+        <div className="sm:col-span-2 flex justify-end">
+          <Skeleton className="h-11 w-40 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useApi } from '@/hooks/useApi';
 import { eventsAPI, ticketsAPI, certificatesAPI } from '@/lib/api';
 import { formatDate, getStatusColor, downloadBlob, getImageUrl } from '@/lib/utils';
 import {
@@ -18,6 +19,7 @@ export default function StudentDashboard() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const toast = useToast();
+  const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
   const [tickets, setTickets] = useState<TicketType[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -26,6 +28,7 @@ export default function StudentDashboard() {
   const [ticketFilter, setTicketFilter] = useState<'all' | 'unused' | 'used' | 'cancelled'>('all');
   const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
   const [previewTicket, setPreviewTicket] = useState<TicketType | null>(null);
+  const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -41,21 +44,25 @@ export default function StudentDashboard() {
       setEvents(eventsRes.data.data.events);
       setTickets(ticketsRes.data.data.tickets);
       setCertificates(certificatesRes.data.data.certificates || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to load dashboard');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRegister = async (eventId: string) => {
-    try {
-      await ticketsAPI.register(eventId);
-      toast.success('Successfully registered for the event');
-      fetchData(); // Refresh data
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Registration failed');
-    }
+    setRegisteringEventId(eventId);
+
+    await api.run(() => ticketsAPI.register(eventId), {
+      successMessage: 'Successfully registered for the event',
+      errorMessage: (err) => err?.response?.data?.message || 'Registration failed',
+      onSuccess: () => {
+        fetchData(); // Refresh data
+      },
+    });
+
+    setRegisteringEventId(null);
   };
 
   const handleDownloadTicket = async (ticketId: string) => {
@@ -223,6 +230,7 @@ export default function StudentDashboard() {
                 key={event._id}
                 event={event}
                 isRegistered={isRegistered(event._id)}
+                isRegistering={registeringEventId === event._id}
                 onRegister={() => handleRegister(event._id)}
               />
             ))}
@@ -393,7 +401,7 @@ function StatCard({ icon, label, value, onClick, isActive }: any) {
   );
 }
 
-function EventCard({ event, isRegistered, onRegister }: any) {
+function EventCard({ event, isRegistered, isRegistering, onRegister }: any) {
   const bannerUrl = getImageUrl(event.bannerUrl);
   
   return (
@@ -441,11 +449,12 @@ function EventCard({ event, isRegistered, onRegister }: any) {
             ✓ Registered
           </button>
         ) : event.seatsAvailable > 0 ? (
-          <button 
-            onClick={onRegister} 
-            className="w-full py-2.5 rounded-xl font-medium bg-neutral-900 text-white hover:bg-neutral-800 transition-colors"
+          <button
+            onClick={onRegister}
+            disabled={isRegistering}
+            className="w-full py-2.5 rounded-xl font-medium bg-neutral-900 text-white hover:bg-neutral-800 transition-colors disabled:opacity-50"
           >
-            Register Now
+            {isRegistering ? 'Registering…' : 'Register Now'}
           </button>
         ) : (
           <button disabled className="w-full py-2.5 rounded-xl font-medium bg-neutral-100 text-neutral-400">

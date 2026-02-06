@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -105,45 +105,38 @@ function ToastContainer({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: st
 // Individual Toast Item
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
   const icons = {
-    success: <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />,
-    error: <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />,
-    warning: <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />,
-    info: <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />,
+    success: <CheckCircle2 className="h-5 w-5 text-neutral-900 flex-shrink-0" />,
+    error: <XCircle className="h-5 w-5 text-neutral-900 flex-shrink-0" />,
+    warning: <Info className="h-5 w-5 text-neutral-900 flex-shrink-0" />,
+    info: <Info className="h-5 w-5 text-neutral-900 flex-shrink-0" />,
   };
 
-  const bgColors = {
-    success: 'bg-green-50 border-green-200',
-    error: 'bg-red-50 border-red-200',
-    warning: 'bg-amber-50 border-amber-200',
-    info: 'bg-blue-50 border-blue-200',
-  };
-
-  const textColors = {
-    success: 'text-green-800',
-    error: 'text-red-800',
-    warning: 'text-amber-800',
-    info: 'text-blue-800',
+  const borderAccent = {
+    success: 'border-neutral-900/20',
+    error: 'border-neutral-900/40',
+    warning: 'border-neutral-900/20',
+    info: 'border-neutral-900/20',
   };
 
   return (
     <div
       className={cn(
         'pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-lg',
+        'bg-white text-neutral-900',
         'animate-in slide-in-from-right-full sm:slide-in-from-top-2 fade-in duration-300',
         'max-w-sm w-full sm:w-auto sm:min-w-[320px]',
-        bgColors[toast.type]
+        borderAccent[toast.type]
       )}
     >
       {icons[toast.type]}
-      <p className={cn('flex-1 text-sm font-medium', textColors[toast.type])}>
+      <p className={cn('flex-1 text-sm font-medium text-neutral-800')}>
         {toast.message}
       </p>
       <button
         onClick={() => onDismiss(toast.id)}
         className={cn(
           'p-1 rounded-lg transition-colors flex-shrink-0',
-          'hover:bg-black/5',
-          textColors[toast.type]
+          'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
         )}
       >
         <X className="h-4 w-4" />

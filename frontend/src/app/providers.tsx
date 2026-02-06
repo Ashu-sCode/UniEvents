@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProvider } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
+import { LoadingProvider } from '@/context/LoadingContext';
+import { GlobalLoader } from '@/components/GlobalLoader';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -21,7 +23,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <LoadingProvider>
+          <AuthProvider>
+            {children}
+            <GlobalLoader />
+          </AuthProvider>
+        </LoadingProvider>
       </ToastProvider>
     </QueryClientProvider>
   );

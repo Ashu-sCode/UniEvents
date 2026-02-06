@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useApi } from '@/hooks/useApi';
 import { eventsAPI, ticketsAPI } from '@/lib/api';
 import { formatDate, getStatusColor, getImageUrl, isValidImageType } from '@/lib/utils';
 import {
@@ -12,7 +13,7 @@ import {
   BarChart3, Eye, Camera, Keyboard, Award, Upload, X,
   Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin, UserCircle
 } from 'lucide-react';
-import type { Event } from '@/types';
+import type { Event, EventStatus } from '@/types';
 import CameraScan from '@/components/CameraScan';
 import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -21,6 +22,7 @@ export default function OrganizerDashboard() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const toast = useToast();
+  const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -62,9 +64,8 @@ export default function OrganizerDashboard() {
     try {
       const response = await eventsAPI.getAll();
       setEvents(response.data.data.events);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-      toast.error('Failed to load events');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to load events');
     } finally {
       setIsLoading(false);
     }
@@ -73,17 +74,27 @@ export default function OrganizerDashboard() {
   const handleConfirmDelete = async () => {
     if (!deleteCandidate) return;
 
+    const toDelete = deleteCandidate;
+    const previous = events;
+
     setIsDeletingEvent(true);
-    try {
-      await eventsAPI.delete(deleteCandidate._id);
-      toast.success('Event deleted successfully');
-      setDeleteCandidate(null);
-      fetchEvents();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete event');
-    } finally {
-      setIsDeletingEvent(false);
-    }
+
+    await api.run(() => eventsAPI.delete(toDelete._id), {
+      optimisticUpdate: () => {
+        // Optimistic UI: remove immediately
+        setEvents((prev) => prev.filter((e) => e._id !== toDelete._id));
+      },
+      rollback: () => {
+        setEvents(previous);
+      },
+      successMessage: 'Event deleted successfully',
+      errorMessage: (err) => err?.response?.data?.message || 'Failed to delete event',
+      onSuccess: () => {
+        setDeleteCandidate(null);
+      },
+    });
+
+    setIsDeletingEvent(false);
   };
 
   return (
@@ -224,7 +235,12 @@ export default function OrganizerDashboard() {
                 }}
                 onDelete={() => setDeleteCandidate(event)}
                 isDeleting={isDeletingEvent && deleteCandidate?._id === event._id}
-                onRefresh={fetchEvents}
+                onSetStatus={(eventId: string, status: EventStatus) => {
+                  setEvents((prev) => prev.map((e) => (e._id === eventId ? { ...e, status } : e)));
+                }}
+                onReplace={(eventId: string, patch: Partial<Event>) => {
+                  setEvents((prev) => prev.map((e) => (e._id === eventId ? { ...e, ...patch } : e)));
+                }}
               />
             ))}
             {filteredEvents.length === 0 && events.length > 0 && (
@@ -258,9 +274,17 @@ export default function OrganizerDashboard() {
       {showCreateModal && (
         <CreateEventModal
           onClose={() => setShowCreateModal(false)}
+          onOptimisticCreate={(tempEvent: Event) => {
+            setEvents((prev) => [tempEvent, ...prev]);
+          }}
+          onCommitCreate={(tempId: string, realEvent: Event) => {
+            setEvents((prev) => prev.map((e) => (e._id === tempId ? realEvent : e)));
+          }}
+          onRollbackCreate={(tempId: string) => {
+            setEvents((prev) => prev.filter((e) => e._id !== tempId));
+          }}
           onSuccess={() => {
             setShowCreateModal(false);
-            fetchEvents();
           }}
         />
       )}
@@ -336,34 +360,46 @@ function EventCardSkeleton() {
   );
 }
 
-function EventCard({ event, onScan, onEdit, onDelete, isDeleting, onRefresh }: any) {
+function EventCard({ event, onScan, onEdit, onDelete, isDeleting, onSetStatus, onReplace }: any) {
   const toast = useToast();
+  const api = useApi();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = async (newStatus: EventStatus) => {
+    const prevStatus: EventStatus = event.status;
+
     setIsUpdating(true);
-    try {
-      const response = await eventsAPI.update(event._id, { status: newStatus });
-      const certResult = response.data.data.certificates;
 
-      if (newStatus === 'published') {
-        toast.success('Event published');
-      } else if (newStatus === 'completed') {
-        if (certResult?.generated > 0) {
-          toast.success(`Event completed — ${certResult.generated} certificates generated`);
-        } else {
-          toast.success('Event marked as completed');
+    await api.run(() => eventsAPI.update(event._id, { status: newStatus }), {
+      optimisticUpdate: () => {
+        onSetStatus?.(event._id, newStatus);
+      },
+      rollback: () => {
+        onSetStatus?.(event._id, prevStatus);
+      },
+      successMessage: (response: any) => {
+        const certResult = response.data?.data?.certificates;
+
+        if (newStatus === 'published') return 'Event published';
+        if (newStatus === 'completed') {
+          if (certResult?.generated > 0) {
+            return `Event completed — ${certResult.generated} certificates generated`;
+          }
+          return 'Event marked as completed';
         }
-      } else {
-        toast.success('Event status updated');
-      }
 
-      onRefresh();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update event status');
-    } finally {
-      setIsUpdating(false);
-    }
+        return 'Event status updated';
+      },
+      errorMessage: (err) => err?.response?.data?.message || 'Failed to update event status',
+      onSuccess: (response: any) => {
+        const updatedEvent = response.data?.data?.event;
+        if (updatedEvent) {
+          onReplace?.(event._id, updatedEvent);
+        }
+      },
+    });
+
+    setIsUpdating(false);
   };
 
 
@@ -490,8 +526,9 @@ function EventCard({ event, onScan, onEdit, onDelete, isDeleting, onRefresh }: a
   );
 }
 
-function CreateEventModal({ onClose, onSuccess }: any) {
+function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCreate, onRollbackCreate }: any) {
   const toast = useToast();
+  const api = useApi();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -534,8 +571,36 @@ function CreateEventModal({ onClose, onSuccess }: any) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const tempId = `temp-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
+    // Build a temporary event for optimistic UI.
+    const tempEvent: any = {
+      _id: tempId,
+      id: tempId,
+      title: formData.title,
+      description: formData.description,
+      organizerId: 'me',
+      eventType: formData.eventType,
+      department: formData.department,
+      seatLimit: Number(formData.seatLimit) || 1,
+      registeredCount: 0,
+      date: formData.date,
+      time: formData.time,
+      venue: formData.venue,
+      status: 'draft',
+      bannerUrl: null,
+      enableCertificates: !!formData.enableCertificates,
+      seatsAvailable: Number(formData.seatLimit) || 1,
+      isRegistrationOpen: false,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
     setIsLoading(true);
-    try {
+
+    const buildRequest = async () => {
       // Use FormData if there's a banner image
       if (bannerFile) {
         const formDataObj = new FormData();
@@ -543,17 +608,33 @@ function CreateEventModal({ onClose, onSuccess }: any) {
           formDataObj.append(key, String(value));
         });
         formDataObj.append('banner', bannerFile);
-        await eventsAPI.create(formDataObj);
-      } else {
-        await eventsAPI.create(formData);
+        return eventsAPI.create(formDataObj);
       }
-      toast.success('Event created successfully');
-      onSuccess();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create event');
-    } finally {
-      setIsLoading(false);
-    }
+      return eventsAPI.create(formData);
+    };
+
+    await api.run(buildRequest, {
+      optimisticUpdate: () => {
+        onOptimisticCreate?.(tempEvent);
+      },
+      rollback: () => {
+        onRollbackCreate?.(tempId);
+      },
+      successMessage: 'Event created successfully',
+      errorMessage: (err) => err?.response?.data?.message || 'Failed to create event',
+      onSuccess: (res: any) => {
+        const created = res.data?.data?.event;
+        if (created) {
+          onCommitCreate?.(tempId, created);
+        } else {
+          onRollbackCreate?.(tempId);
+        }
+
+        onSuccess();
+      },
+    });
+
+    setIsLoading(false);
   };
 
   return (

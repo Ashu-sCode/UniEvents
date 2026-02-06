@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import type { User } from '@/types';
+import { useLoading } from '@/context/LoadingContext';
 
 interface AuthContextType {
   user: User | null;
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { showGlobalLoader, hideGlobalLoader } = useLoading();
 
   // Initialize auth state from localStorage
   useEffect(() => {
@@ -48,38 +50,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
-    const { user: userData, token: authToken } = response.data.data;
+    showGlobalLoader();
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { user: userData, token: authToken } = response.data.data;
 
-    setUser(userData);
-    setToken(authToken);
-    localStorage.setItem('token', authToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+      setUser(userData);
+      setToken(authToken);
+      localStorage.setItem('token', authToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
-    // Redirect based on role
-    if (userData.role === 'organizer') {
-      router.push('/dashboard/organizer');
-    } else {
-      router.push('/dashboard/student');
+      // Redirect based on role
+      if (userData.role === 'organizer') {
+        router.push('/dashboard/organizer');
+      } else {
+        router.push('/dashboard/student');
+      }
+    } finally {
+      hideGlobalLoader();
     }
   };
 
   const signup = async (data: SignupData) => {
-    const response = await api.post('/auth/signup', data);
-    const { user: userData, token: authToken } = response.data.data;
+    showGlobalLoader();
+    try {
+      const response = await api.post('/auth/signup', data);
+      const { user: userData, token: authToken } = response.data.data;
 
-    setUser(userData);
-    setToken(authToken);
-    localStorage.setItem('token', authToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+      setUser(userData);
+      setToken(authToken);
+      localStorage.setItem('token', authToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
-    // Redirect based on role
-    if (userData.role === 'organizer') {
-      router.push('/dashboard/organizer');
-    } else {
-      router.push('/dashboard/student');
+      // Redirect based on role
+      if (userData.role === 'organizer') {
+        router.push('/dashboard/organizer');
+      } else {
+        router.push('/dashboard/student');
+      }
+    } finally {
+      hideGlobalLoader();
     }
   };
 
@@ -89,12 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    delete api.defaults.headers.common['Authorization'];
-    router.push('/login');
+    showGlobalLoader();
+    try {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      delete api.defaults.headers.common['Authorization'];
+      router.push('/login');
+    } finally {
+      hideGlobalLoader();
+    }
   };
 
   return (

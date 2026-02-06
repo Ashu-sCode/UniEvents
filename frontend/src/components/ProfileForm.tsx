@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { Save } from 'lucide-react';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, ProfileFormSkeleton } from '@/components/ui';
 import { usersAPI } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 import type { User } from '@/types';
 
 type FormState = {
@@ -17,6 +18,7 @@ type FormState = {
 export default function ProfileForm() {
   const { updateUser } = useAuth();
   const toast = useToast();
+  const { showGlobalLoader, hideGlobalLoader } = useLoading();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,6 +58,19 @@ export default function ProfileForm() {
     e.preventDefault();
 
     setIsSaving(true);
+    showGlobalLoader();
+
+    // Optimistic update (rollback on failure)
+    const previousUser = user;
+    const optimisticUser: User | null = user
+      ? { ...user, name: form.name, phone: form.phone, department: form.department }
+      : null;
+
+    if (optimisticUser) {
+      setUser(optimisticUser);
+      updateUser(optimisticUser);
+    }
+
     try {
       const payload = {
         name: form.name,
@@ -68,13 +83,27 @@ export default function ProfileForm() {
 
       setUser(updated);
       updateUser(updated);
-      toast.success('Profile updated');
+      toast.success('Profile updated successfully');
     } catch (err: any) {
+      // rollback
+      if (previousUser) {
+        setUser(previousUser);
+        updateUser(previousUser);
+      }
       toast.error(err.response?.data?.message || 'Failed to update profile');
     } finally {
+      hideGlobalLoader();
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-3xl">
+        <ProfileFormSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl">
@@ -128,15 +157,11 @@ export default function ProfileForm() {
           />
 
           <div className="sm:col-span-2 flex justify-end">
-            <Button type="submit" isLoading={isSaving} disabled={isLoading || isSaving}>
+            <Button type="submit" isLoading={isSaving} disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
-              Save Changes
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
-
-          {isLoading && (
-            <p className="sm:col-span-2 text-sm text-neutral-500">Loading profile…</p>
-          )}
         </form>
       </Card>
     </div>
