@@ -102,6 +102,8 @@ export const ticketsAPI = {
     api.get(`/tickets/${ticketId}`),
   verify: (data: { ticketId: string; eventId: string }) => 
     api.post('/tickets/verify', data),
+  cancel: (ticketId: string) =>
+    api.patch(`/tickets/${ticketId}/cancel`),
   download: (ticketId: string) => 
     api.get(`/tickets/${ticketId}/download`, { responseType: 'blob' }),
   preview: (ticketId: string) => 

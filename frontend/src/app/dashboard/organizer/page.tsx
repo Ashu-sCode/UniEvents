@@ -234,6 +234,7 @@ export default function OrganizerDashboard() {
                   setShowEditModal(true);
                 }}
                 onDelete={() => setDeleteCandidate(event)}
+                onView={() => router.push(`/dashboard/organizer/events/${event._id}`)}
                 isDeleting={isDeletingEvent && deleteCandidate?._id === event._id}
                 onSetStatus={(eventId: string, status: EventStatus) => {
                   setEvents((prev) => prev.map((e) => (e._id === eventId ? { ...e, status } : e)));
@@ -360,7 +361,7 @@ function EventCardSkeleton() {
   );
 }
 
-function EventCard({ event, onScan, onEdit, onDelete, isDeleting, onSetStatus, onReplace }: any) {
+function EventCard({ event, onScan, onEdit, onDelete, onView, isDeleting, onSetStatus, onReplace }: any) {
   const toast = useToast();
   const api = useApi();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -515,7 +516,7 @@ function EventCard({ event, onScan, onEdit, onDelete, isDeleting, onSetStatus, o
           </button>
           <button
             className="flex-1 py-2 px-2 text-neutral-600 text-xs font-medium rounded-lg hover:bg-neutral-100 transition-all flex items-center justify-center gap-1.5"
-            onClick={() => toast.info('Event details view is not available yet')}
+            onClick={onView}
           >
             <Eye className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">View</span>
