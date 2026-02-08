@@ -18,4 +18,7 @@ router.get('/:ticketId/preview', authenticate, ticketController.previewTicketPDF
 // Organizer routes - QR verification at event entry
 router.post('/verify', authenticate, organizerOnly, ticketController.verifyTicket);
 
+// Organizer routes - manage registrations
+router.patch('/:ticketId/cancel', authenticate, organizerOnly, ticketController.cancelTicket);
+
 module.exports = router;

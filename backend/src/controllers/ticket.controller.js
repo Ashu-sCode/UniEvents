@@ -352,11 +352,79 @@ const previewTicketPDF = async (req, res, next) => {
   }
 };
 
+/**
+ * @route   PATCH /api/tickets/:ticketId/cancel
+ * @desc    Cancel a registration ticket (organizer only, own event)
+ * @access  Private (Organizer)
+ */
+const cancelTicket = async (req, res, next) => {
+  try {
+    const { ticketId } = req.params;
+
+    const ticket = await Ticket.findOne({ ticketId })
+      .populate('eventId', 'organizerId registeredCount title')
+      .populate('userId', 'name email rollNumber department');
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    // Verify organizer owns this event
+    const event = ticket.eventId;
+    if (!event || event.organizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to cancel tickets for this event'
+      });
+    }
+
+    // Idempotent behavior: already cancelled => success
+    if (ticket.status === Ticket.TICKET_STATUS.CANCELLED) {
+      return res.json({
+        success: true,
+        message: 'Ticket already cancelled',
+        data: { ticket }
+      });
+    }
+
+    // Disallow cancelling used tickets to keep attendance consistent
+    if (ticket.status === Ticket.TICKET_STATUS.USED) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel a used ticket'
+      });
+    }
+
+    // Cancel the ticket
+    ticket.status = Ticket.TICKET_STATUS.CANCELLED;
+    await ticket.save();
+
+    // Decrement registered count (best-effort)
+    try {
+      await Event.findByIdAndUpdate(ticket.eventId._id, { $inc: { registeredCount: -1 } });
+    } catch (e) {
+      console.error('Error decrementing event registeredCount:', e);
+    }
+
+    res.json({
+      success: true,
+      message: 'Ticket cancelled',
+      data: { ticket }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerForEvent,
   getMyTickets,
   getTicketById,
   verifyTicket,
+  cancelTicket,
   downloadTicketPDF,
   previewTicketPDF
 };
