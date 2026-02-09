@@ -3,10 +3,17 @@
  * JWT settings and role definitions
  */
 
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  // Fail fast (should also be enforced in server.js)
+  throw new Error('JWT_SECRET is required');
+}
+
 module.exports = {
   // JWT Configuration
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-super-secret-key-change-in-production',
+    secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     issuer: 'unievent'
   },
