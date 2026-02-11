@@ -11,11 +11,13 @@ const userController = require('../controllers/user.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const validateRequest = require('../middleware/validateRequest');
 const { profilePhotoUpload, handleUploadError } = require('../middleware/uploadMiddleware');
+const { stripTags } = require('../utils/sanitize');
 
 const updateMeValidation = [
   body('name')
     .optional()
     .trim()
+    .customSanitizer(stripTags)
     .isLength({ min: 2, max: 100 })
     .withMessage('Name must be between 2 and 100 characters'),
   body('phone')
@@ -26,6 +28,7 @@ const updateMeValidation = [
   body('department')
     .optional()
     .trim()
+    .customSanitizer(stripTags)
     .isLength({ min: 2, max: 100 })
     .withMessage('Department must be between 2 and 100 characters')
 ];

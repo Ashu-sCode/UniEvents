@@ -9,26 +9,59 @@ const { body } = require('express-validator');
 const authController = require('../controllers/auth.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const validateRequest = require('../middleware/validateRequest');
+const { authLimiter } = require('../middleware/rateLimiters');
+const { stripTags } = require('../utils/sanitize');
 
 // Validation rules
 const signupValidation = [
-  body('name').trim().notEmpty().withMessage('Name is required'),
-  body('email').isEmail().withMessage('Please provide a valid email'),
+  body('name')
+    .trim()
+    .customSanitizer(stripTags)
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Name must be between 2 and 100 characters'),
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail(),
   body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters'),
-  body('department').trim().notEmpty().withMessage('Department is required'),
-  body('role').optional().isIn(['student', 'organizer']).withMessage('Invalid role')
+    .isString()
+    .isLength({ min: 6, max: 128 })
+    .withMessage('Password must be between 6 and 128 characters'),
+  body('department')
+    .trim()
+    .customSanitizer(stripTags)
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Department must be between 2 and 100 characters'),
+  body('role')
+    .optional()
+    .isIn(['student', 'organizer'])
+    .withMessage('Invalid role'),
+  // Roll number is required for students (matches controller behavior)
+  body('rollNumber')
+    .if(body('role').equals('student'))
+    .trim()
+    .customSanitizer(stripTags)
+    .isLength({ min: 1, max: 30 })
+    .withMessage('Roll number is required for students')
 ];
 
 const loginValidation = [
-  body('email').isEmail().withMessage('Please provide a valid email'),
-  body('password').notEmpty().withMessage('Password is required')
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail(),
+  body('password')
+    .isString()
+    .notEmpty()
+    .withMessage('Password is required')
+    .isLength({ max: 128 })
+    .withMessage('Password is too long')
 ];
 
 // Routes
-router.post('/signup', signupValidation, validateRequest, authController.signup);
-router.post('/login', loginValidation, validateRequest, authController.login);
+// Rate limit ONLY auth endpoints (do not rate-limit other APIs)
+router.post('/signup', authLimiter, signupValidation, validateRequest, authController.signup);
+router.post('/login', authLimiter, loginValidation, validateRequest, authController.login);
 router.get('/me', authenticate, authController.getProfile);
 
 module.exports = router;

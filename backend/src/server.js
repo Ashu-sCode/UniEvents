@@ -4,6 +4,12 @@
  */
 
 require('dotenv').config();
+
+// Fail fast if critical security config is missing
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is required. Set it in your backend .env before starting the server.');
+}
+
 const app = require('./app');
 const connectDB = require('./config/database');
 const os = require('os');
