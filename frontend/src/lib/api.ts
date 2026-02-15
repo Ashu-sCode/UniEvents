@@ -62,6 +62,10 @@ export const authAPI = {
     api.post('/auth/signup', data),
   getProfile: () => 
     api.get('/auth/me'),
+  forgotPassword: (data: { email: string }) =>
+    api.post('/auth/forgot-password', data),
+  resetPassword: (token: string, data: { password: string }) =>
+    api.post(`/auth/reset-password/${token}`, data),
 };
 
 export const eventsAPI = {
@@ -96,8 +100,12 @@ export const eventsAPI = {
 export const ticketsAPI = {
   register: (eventId: string) => 
     api.post(`/tickets/register/${eventId}`),
-  getMyTickets: () => 
-    api.get('/tickets/my-tickets'),
+  // Backward compatible list
+  getMyTickets: (params?: any) => 
+    api.get('/tickets/my-tickets', { params }),
+  // New alias list (supports pagination)
+  getAll: (params?: any) =>
+    api.get('/tickets', { params }),
   getById: (ticketId: string) => 
     api.get(`/tickets/${ticketId}`),
   verify: (data: { ticketId: string; eventId: string }) => 

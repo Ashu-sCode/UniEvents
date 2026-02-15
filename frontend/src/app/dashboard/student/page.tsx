@@ -9,11 +9,23 @@ import { eventsAPI, ticketsAPI, certificatesAPI } from '@/lib/api';
 import { formatDate, getStatusColor, downloadBlob, getImageUrl } from '@/lib/utils';
 import {
   Calendar, Ticket, Award, LogOut,
-  MapPin, Clock, Users, Download, FileText, Eye, ChevronRight, UserCircle
+  MapPin, Clock, Users, Download, FileText, Eye,
+  ChevronRight, UserCircle, Search, Filter
 } from 'lucide-react';
 import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
+
+const DEPARTMENT_OPTIONS = [
+  'Computer Science',
+  'Electrical Engineering',
+  'Mechanical Engineering',
+  'Civil Engineering',
+  'Electronics',
+  'Information Technology',
+  'MBA',
+  'Other',
+];
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -21,35 +33,130 @@ export default function StudentDashboard() {
   const toast = useToast();
   const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
-  const [tickets, setTickets] = useState<TicketType[]>([]);
+  const [ticketsAll, setTicketsAll] = useState<TicketType[]>([]);
+  const [ticketsPageItems, setTicketsPageItems] = useState<TicketType[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'events' | 'tickets' | 'certificates'>('events');
+
+  // Pagination
+  const EVENTS_LIMIT = 6;
+  const TICKETS_LIMIT = 6;
+
+  const [eventsPage, setEventsPage] = useState(1);
+  const [eventsTotalPages, setEventsTotalPages] = useState(1);
+  const [eventsTotal, setEventsTotal] = useState(0);
+
+  const [ticketsPage, setTicketsPage] = useState(1);
+  const [ticketsTotalPages, setTicketsTotalPages] = useState(1);
+  const [ticketsTotal, setTicketsTotal] = useState(0);
+
+  // Event search/filter
+  const [eventSearchInput, setEventSearchInput] = useState('');
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventDepartment, setEventDepartment] = useState('');
+  const [eventType, setEventType] = useState<'all' | 'public' | 'departmental'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [ticketFilter, setTicketFilter] = useState<'all' | 'unused' | 'used' | 'cancelled'>('all');
   const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
   const [previewTicket, setPreviewTicket] = useState<TicketType | null>(null);
   const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
 
+  // Read initial page state from query string (client-side) to avoid Next.js useSearchParams SSR issues
   useEffect(() => {
-    fetchData();
+    const params = new URLSearchParams(window.location.search);
+    const ep = parseInt(params.get('eventsPage') || '1', 10);
+    const tp = parseInt(params.get('ticketsPage') || '1', 10);
+    if (!isNaN(ep) && ep > 0) setEventsPage(ep);
+    if (!isNaN(tp) && tp > 0) setTicketsPage(tp);
   }, []);
 
-  const fetchData = async () => {
+  // Debounce event search input
+  useEffect(() => {
+    const t = setTimeout(() => setEventSearch(eventSearchInput.trim()), 350);
+    return () => clearTimeout(t);
+  }, [eventSearchInput]);
+
+  // Keep pages in query string
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('eventsPage', String(eventsPage));
+    url.searchParams.set('ticketsPage', String(ticketsPage));
+    window.history.replaceState(null, '', url.toString());
+  }, [eventsPage, ticketsPage]);
+
+  const fetchEvents = async () => {
+    const params: any = {
+      upcoming: 'true',
+      page: eventsPage,
+      limit: EVENTS_LIMIT,
+    };
+
+    if (eventSearch) params.search = eventSearch;
+    if (eventDepartment) params.department = eventDepartment;
+    if (eventType !== 'all') params.type = eventType;
+    if (dateFrom) params.dateFrom = dateFrom;
+    if (dateTo) params.dateTo = dateTo;
+
     try {
-      const [eventsRes, ticketsRes, certificatesRes] = await Promise.all([
-        eventsAPI.getAll({ upcoming: 'true' }),
-        ticketsAPI.getMyTickets(),
-        certificatesAPI.getMyCertificates(),
-      ]);
+      const eventsRes = await eventsAPI.getAll(params);
       setEvents(eventsRes.data.data.events);
-      setTickets(ticketsRes.data.data.tickets);
-      setCertificates(certificatesRes.data.data.certificates || []);
+      setEventsTotal(eventsRes.data.total || 0);
+      setEventsTotalPages(eventsRes.data.totalPages || 1);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to load dashboard');
-    } finally {
-      setIsLoading(false);
+      toast.error(error.response?.data?.message || 'Failed to load events');
     }
   };
+
+  const fetchTicketsAll = async () => {
+    try {
+      const ticketsRes = await ticketsAPI.getMyTickets();
+      setTicketsAll(ticketsRes.data.data.tickets);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to load tickets');
+    }
+  };
+
+  const fetchTicketsPage = async () => {
+    try {
+      const ticketsRes = await ticketsAPI.getAll({ page: ticketsPage, limit: TICKETS_LIMIT });
+      setTicketsPageItems(ticketsRes.data.data.tickets);
+      setTicketsTotal(ticketsRes.data.total || 0);
+      setTicketsTotalPages(ticketsRes.data.totalPages || 1);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to load tickets');
+    }
+  };
+
+  const fetchCertificates = async () => {
+    try {
+      const certificatesRes = await certificatesAPI.getMyCertificates();
+      setCertificates(certificatesRes.data.data.certificates || []);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to load certificates');
+    }
+  };
+
+  useEffect(() => {
+    // Initial load
+    (async () => {
+      setIsLoading(true);
+      await Promise.all([fetchEvents(), fetchTicketsAll(), fetchTicketsPage(), fetchCertificates()]);
+      setIsLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventsPage, eventSearch, eventDepartment, eventType, dateFrom, dateTo]);
+
+  useEffect(() => {
+    fetchTicketsPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketsPage]);
 
   const handleRegister = async (eventId: string) => {
     setRegisteringEventId(eventId);
@@ -57,8 +164,8 @@ export default function StudentDashboard() {
     await api.run(() => ticketsAPI.register(eventId), {
       successMessage: 'Successfully registered for the event',
       errorMessage: (err) => err?.response?.data?.message || 'Registration failed',
-      onSuccess: () => {
-        fetchData(); // Refresh data
+      onSuccess: async () => {
+        await Promise.all([fetchEvents(), fetchTicketsAll(), fetchTicketsPage()]);
       },
     });
 
@@ -86,7 +193,7 @@ export default function StudentDashboard() {
   };
 
   const isRegistered = (eventId: string) => {
-    return tickets.some(t => {
+    return ticketsAll.some(t => {
       // `t.eventId` can be a string, a populated event object, or null (e.g. if the event was deleted).
       const eId =
         typeof t.eventId === 'string'
@@ -99,8 +206,8 @@ export default function StudentDashboard() {
 
   const sortedAndFilteredTickets = useMemo(() => {
     const filtered = ticketFilter === 'all'
-      ? tickets
-      : tickets.filter(t => t.status === ticketFilter);
+      ? ticketsPageItems
+      : ticketsPageItems.filter(t => t.status === ticketFilter);
 
     // Stable sort: keep original index as final tie-breaker
     const withIndex = filtered.map((t, idx) => ({ t, idx }));
@@ -120,7 +227,7 @@ export default function StudentDashboard() {
     });
 
     return withIndex.map(x => x.t);
-  }, [tickets, ticketFilter]);
+  }, [ticketsPageItems, ticketFilter]);
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -162,14 +269,14 @@ export default function StudentDashboard() {
           <StatCard
             icon={<Calendar className="h-6 w-6" />}
             label="Upcoming Events"
-            value={events.length}
+            value={eventsTotal || events.length}
             onClick={() => setActiveTab('events')}
             isActive={activeTab === 'events'}
           />
           <StatCard
             icon={<Ticket className="h-6 w-6" />}
             label="My Tickets"
-            value={tickets.length}
+            value={ticketsTotal || ticketsAll.length}
             onClick={() => setActiveTab('tickets')}
             isActive={activeTab === 'tickets'}
           />
@@ -225,6 +332,84 @@ export default function StudentDashboard() {
           </div>
         ) : activeTab === 'events' ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* Search & filters */}
+            <div className="md:col-span-2 lg:col-span-3 mb-2">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                  <input
+                    value={eventSearchInput}
+                    onChange={(e) => {
+                      setEventsPage(1);
+                      setEventSearchInput(e.target.value);
+                    }}
+                    placeholder="Search events…"
+                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  />
+                </div>
+
+                <div className="relative">
+                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                  <select
+                    value={eventType}
+                    onChange={(e) => {
+                      setEventsPage(1);
+                      setEventType(e.target.value as any);
+                    }}
+                    className="appearance-none w-full sm:w-auto pl-10 pr-10 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="public">Public</option>
+                    <option value="departmental">Departmental</option>
+                  </select>
+                </div>
+
+                <div className="w-full sm:w-64">
+                  <select
+                    value={eventDepartment}
+                    onChange={(e) => {
+                      setEventsPage(1);
+                      setEventDepartment(e.target.value);
+                    }}
+                    className="input"
+                  >
+                    <option value="">All Departments</option>
+                    {DEPARTMENT_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-full sm:w-52">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => {
+                      setEventsPage(1);
+                      setDateFrom(e.target.value);
+                    }}
+                    className="input"
+                    title="From date"
+                  />
+                </div>
+
+                <div className="w-full sm:w-52">
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => {
+                      setEventsPage(1);
+                      setDateTo(e.target.value);
+                    }}
+                    className="input"
+                    title="To date"
+                  />
+                </div>
+              </div>
+            </div>
+
             {events.map((event) => (
               <EventCard
                 key={event._id}
@@ -236,8 +421,32 @@ export default function StudentDashboard() {
             ))}
             {events.length === 0 && (
               <p className="text-neutral-500 col-span-3 text-center py-16">
-                No upcoming events available.
+                No events found.
               </p>
+            )}
+
+            {/* Pagination */}
+            {eventsTotalPages > 1 && (
+              <div className="col-span-full flex items-center justify-center gap-3 pt-4">
+                <button
+                  onClick={() => setEventsPage((p) => Math.max(1, p - 1))}
+                  disabled={eventsPage <= 1}
+                  className="px-4 py-2 rounded-xl bg-white border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-neutral-600">
+                  Page <strong className="text-neutral-900">{eventsPage}</strong> of{' '}
+                  <strong className="text-neutral-900">{eventsTotalPages}</strong>
+                </span>
+                <button
+                  onClick={() => setEventsPage((p) => Math.min(eventsTotalPages, p + 1))}
+                  disabled={eventsPage >= eventsTotalPages}
+                  className="px-4 py-2 rounded-xl bg-white border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
             )}
           </div>
         ) : activeTab === 'tickets' ? (
@@ -275,7 +484,7 @@ export default function StudentDashboard() {
               ))}
 
               {/* Empty states */}
-              {tickets.length === 0 ? (
+              {ticketsAll.length === 0 ? (
                 <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
                   <Ticket className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
                   <p className="text-neutral-500">
@@ -299,6 +508,30 @@ export default function StudentDashboard() {
                   </button>
                 </div>
               ) : null}
+
+              {/* Pagination */}
+              {ticketsTotalPages > 1 && ticketsAll.length > 0 && (
+                <div className="col-span-full flex items-center justify-center gap-3 pt-4">
+                  <button
+                    onClick={() => setTicketsPage((p) => Math.max(1, p - 1))}
+                    disabled={ticketsPage <= 1}
+                    className="px-4 py-2 rounded-xl bg-white border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-sm text-neutral-600">
+                    Page <strong className="text-neutral-900">{ticketsPage}</strong> of{' '}
+                    <strong className="text-neutral-900">{ticketsTotalPages}</strong>
+                  </span>
+                  <button
+                    onClick={() => setTicketsPage((p) => Math.min(ticketsTotalPages, p + 1))}
+                    disabled={ticketsPage >= ticketsTotalPages}
+                    className="px-4 py-2 rounded-xl bg-white border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : (
