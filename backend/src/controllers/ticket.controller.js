@@ -114,13 +114,35 @@ const registerForEvent = async (req, res, next) => {
  */
 const getMyTickets = async (req, res, next) => {
   try {
-    const tickets = await Ticket.find({ userId: req.user._id })
+    const { page, limit } = req.query;
+
+    const hasPagination = page !== undefined || limit !== undefined;
+    const parsedPage = Math.max(1, parseInt(page || '1', 10));
+    const parsedLimit = Math.min(100, Math.max(1, parseInt(limit || '10', 10)));
+
+    const baseQuery = { userId: req.user._id };
+
+    const total = await Ticket.countDocuments(baseQuery);
+
+    let cursor = Ticket.find(baseQuery)
       .populate('eventId', 'title date time venue status bannerUrl department eventType')
       .sort({ createdAt: -1 });
+
+    if (hasPagination) {
+      cursor = cursor.skip((parsedPage - 1) * parsedLimit).limit(parsedLimit);
+    }
+
+    const tickets = await cursor;
+
+    const totalPages = hasPagination ? Math.max(1, Math.ceil(total / parsedLimit)) : 1;
 
     res.json({
       success: true,
       count: tickets.length,
+      total,
+      page: hasPagination ? parsedPage : 1,
+      totalPages,
+      limit: hasPagination ? parsedLimit : total,
       data: { tickets }
     });
   } catch (error) {

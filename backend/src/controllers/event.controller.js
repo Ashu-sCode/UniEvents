@@ -76,7 +76,23 @@ const createEvent = async (req, res, next) => {
  */
 const getEvents = async (req, res, next) => {
   try {
-    const { status, department, eventType, upcoming } = req.query;
+    const {
+      status,
+      department,
+      eventType,
+      type,
+      upcoming,
+      search,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+    } = req.query;
+
+    const parsedPage = Math.max(1, parseInt(page || '1', 10));
+    const hasPagination = page !== undefined || limit !== undefined;
+    const parsedLimit = Math.min(100, Math.max(1, parseInt(limit || '10', 10)));
+
     let query = {};
 
     // If user is logged in and is an organizer, show their events
@@ -93,23 +109,62 @@ const getEvents = async (req, res, next) => {
       query.department = department;
     }
 
-    // Filter by event type
-    if (eventType) {
-      query.eventType = eventType;
+    // Filter by event type (support both `eventType` and `type` for compatibility)
+    const effectiveType = eventType || type;
+    if (effectiveType) {
+      query.eventType = effectiveType;
     }
 
-    // Filter upcoming events only
+    // Date filters
+    const dateQuery = {};
     if (upcoming === 'true') {
-      query.date = { $gte: new Date() };
+      dateQuery.$gte = new Date();
+    }
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!isNaN(d.getTime())) dateQuery.$gte = d;
+    }
+    if (dateTo) {
+      const d = new Date(dateTo);
+      if (!isNaN(d.getTime())) dateQuery.$lte = d;
+    }
+    if (Object.keys(dateQuery).length > 0) {
+      query.date = dateQuery;
     }
 
-    const events = await Event.find(query)
+    // Keyword search (case-insensitive regex)
+    if (search) {
+      const escaped = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      query.$or = [
+        { title: regex },
+        { description: regex },
+        { venue: regex },
+      ];
+    }
+
+    const total = await Event.countDocuments(query);
+
+    let cursor = Event.find(query)
       .populate('organizerId', 'name email department')
       .sort({ date: 1 });
 
+    if (hasPagination) {
+      cursor = cursor.skip((parsedPage - 1) * parsedLimit).limit(parsedLimit);
+    }
+
+    const events = await cursor;
+
+    const totalPages = hasPagination ? Math.max(1, Math.ceil(total / parsedLimit)) : 1;
+
+    // Backward compatible: keep data.events
     res.json({
       success: true,
       count: events.length,
+      total,
+      page: hasPagination ? parsedPage : 1,
+      totalPages,
+      limit: hasPagination ? parsedLimit : total,
       data: { events }
     });
   } catch (error) {

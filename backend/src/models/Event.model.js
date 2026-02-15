@@ -96,6 +96,10 @@ eventSchema.index({ date: 1, status: 1 });
 eventSchema.index({ organizerId: 1 });
 eventSchema.index({ department: 1, eventType: 1 });
 
+// Search indexes (used for keyword search)
+// Note: even if we use regex for search, a text index is useful for future optimizations.
+eventSchema.index({ title: 'text', description: 'text', venue: 'text' });
+
 // Virtual for checking if seats are available
 eventSchema.virtual('seatsAvailable').get(function() {
   return this.seatLimit - this.registeredCount;

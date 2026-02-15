@@ -58,10 +58,26 @@ const loginValidation = [
     .withMessage('Password is too long')
 ];
 
+const forgotPasswordValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail(),
+];
+
+const resetPasswordValidation = [
+  body('password')
+    .isString()
+    .isLength({ min: 6, max: 128 })
+    .withMessage('Password must be between 6 and 128 characters')
+];
+
 // Routes
 // Rate limit ONLY auth endpoints (do not rate-limit other APIs)
 router.post('/signup', authLimiter, signupValidation, validateRequest, authController.signup);
 router.post('/login', authLimiter, loginValidation, validateRequest, authController.login);
+router.post('/forgot-password', authLimiter, forgotPasswordValidation, validateRequest, authController.forgotPassword);
+router.post('/reset-password/:token', authLimiter, resetPasswordValidation, validateRequest, authController.resetPassword);
 router.get('/me', authenticate, authController.getProfile);
 
 module.exports = router;
