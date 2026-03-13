@@ -160,13 +160,13 @@ export default function SignupClient() {
                 required
               >
                 <option value="">Select Department</option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Electrical Engineering">Electrical Engineering</option>
-                <option value="Mechanical Engineering">Mechanical Engineering</option>
-                <option value="Civil Engineering">Civil Engineering</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Information Technology">Information Technology</option>
-                <option value="MBA">MBA</option>
+                <option value="Computer Science">Bachelor of Computer Application</option>
+                <option value="Electrical Engineering">Bachelor of Science</option>
+                <option value="Mechanical Engineering">Bachelor of Arts</option>
+                <option value="Civil Engineering">Bachelor of Commerce</option>
+                <option value="Electronics">Bachelor of Education</option>
+                <option value="Information Technology">Bachelor of Business Administration</option>
+                <option value="MBA">Diploma</option>
                 <option value="Other">Other</option>
               </select>
             </div>
