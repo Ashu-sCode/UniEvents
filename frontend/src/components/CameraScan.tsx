@@ -20,7 +20,7 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
 
   useEffect(() => {
     startCamera();
-    return () => stopScanner();
+    return () => { stopScanner(); };
   }, []);
 
   const startCamera = async () => {
