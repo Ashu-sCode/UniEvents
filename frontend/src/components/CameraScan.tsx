@@ -22,18 +22,31 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
 
   // 🔊 Beep sound
   const playBeep = () => {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = ctx.createOscillator();
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(1000, ctx.currentTime);
-    oscillator.connect(ctx.destination);
-    oscillator.start();
-    setTimeout(() => oscillator.stop(), 120);
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(1000, ctx.currentTime);
+      oscillator.connect(ctx.destination);
+      oscillator.start();
+      setTimeout(() => oscillator.stop(), 120);
+    } catch {}
   };
 
+  // ✅ FIXED useEffect (NO async return)
   useEffect(() => {
-    startCamera();
-    return () => stopScanner();
+    let isMounted = true;
+
+    (async () => {
+      if (!isMounted) return;
+      await startCamera();
+    })();
+
+    return () => {
+      isMounted = false;
+      // ⚠️ DO NOT return promise
+      stopScanner().catch(() => {});
+    };
   }, []);
 
   const startCamera = async () => {
@@ -54,11 +67,9 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
         aspectRatio: 1.0,
       };
 
-      const constraints = {
+      const constraints: any = {
         facingMode: 'environment',
-        advanced: [
-          { focusMode: 'continuous' }, // 📷 autofocus
-        ],
+        advanced: [{ focusMode: 'continuous' }],
       };
 
       await scannerRef.current.start(
@@ -68,15 +79,16 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
         () => {}
       );
 
-      // 🎥 Get video track for torch control
+      // 🎥 Get video track
       const video = document.querySelector('#qr-reader video') as HTMLVideoElement;
       const stream = video?.srcObject as MediaStream;
+
       if (stream) {
         const track = stream.getVideoTracks()[0];
         videoTrackRef.current = track;
 
-        // 🔦 Try auto torch if supported
-        const capabilities = track.getCapabilities() as any;
+        // 🔦 Auto torch if supported
+        const capabilities: any = track.getCapabilities?.();
         if (capabilities?.torch) {
           try {
             await track.applyConstraints({
@@ -116,7 +128,7 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
       });
       setTorchOn(!torchOn);
     } catch {
-      alert('Torch not supported on this device');
+      alert('Torch not supported');
     }
   };
 
@@ -138,7 +150,7 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
     stopScanner();
     setStatus('success');
 
-    playBeep(); // 🔊 sound
+    playBeep();
 
     let ticketId = decodedText;
 
@@ -156,13 +168,11 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
   };
 
   const handleRetry = () => {
-    stopScanner();
-    startCamera();
+    stopScanner().then(() => startCamera());
   };
 
   const handleClose = () => {
-    stopScanner();
-    onClose();
+    stopScanner().then(() => onClose());
   };
 
   return (
@@ -182,14 +192,13 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
             Scan QR Code
           </h2>
 
-          {/* Scanner */}
           <div className="relative">
             <div
               id="qr-reader"
               className="w-full aspect-square rounded-2xl overflow-hidden"
             />
 
-            {/* 🔦 Torch Button */}
+            {/* Torch */}
             {videoTrackRef.current && (
               <button
                 onClick={toggleTorch}
@@ -201,14 +210,14 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
               </button>
             )}
 
-            {/* ✅ Success Animation */}
+            {/* Success */}
             {status === 'success' && (
               <div className="absolute inset-0 flex items-center justify-center bg-green-500/30 rounded-2xl animate-pulse">
                 <CheckCircle className="text-white w-16 h-16" />
               </div>
             )}
 
-            {/* 🔄 Loading */}
+            {/* Loading */}
             {status === 'starting' && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl">
                 <RefreshCw className="animate-spin text-white w-8 h-8" />
@@ -216,7 +225,6 @@ export default function CameraScan({ onScan, onClose }: CameraScanProps) {
             )}
           </div>
 
-          {/* Error */}
           {error && (
             <div className="mt-4 bg-red-500/10 p-3 rounded-xl text-sm text-red-400">
               <div className="flex gap-2">
