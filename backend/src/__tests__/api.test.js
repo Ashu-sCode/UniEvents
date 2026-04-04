@@ -12,6 +12,7 @@ const app = require('../app');
 const Event = require('../models/Event.model');
 const Ticket = require('../models/Ticket.model');
 const Attendance = require('../models/Attendance.model');
+const Notification = require('../models/Notification.model');
 
 let mongoServer;
 
@@ -389,5 +390,89 @@ describe('UniEvent API integration', () => {
     const refreshedEvent = await Event.findById(event._id);
     expect(refreshedEvent.registeredCount).toBe(1);
     expect(refreshedEvent.waitlistCount).toBe(0);
+  });
+
+  test('notifications are created and can be marked as read', async () => {
+    const organizerPayload = createUserPayload({
+      name: 'Organizer Notify',
+      email: `organizer-notify-${Date.now()}@example.com`,
+      department: 'Computer Science',
+      role: 'organizer',
+      rollNumber: undefined,
+    });
+    const studentPayload = createUserPayload({
+      name: 'Student Notify',
+      email: `student-notify-${Date.now()}@example.com`,
+      department: 'Computer Science',
+    });
+
+    await signupUser(organizerPayload);
+    await signupUser(studentPayload);
+
+    const organizer = await loginUser(organizerPayload);
+    const student = await loginUser(studentPayload);
+
+    const event = await Event.create({
+      title: 'Notification Demo Event',
+      description: 'Testing that registration and event updates create visible notifications.',
+      organizerId: organizer.user.id,
+      eventType: 'public',
+      department: 'Computer Science',
+      seatLimit: 3,
+      registeredCount: 0,
+      waitlistCount: 0,
+      waitlistEnabled: true,
+      date: new Date('2099-05-10'),
+      time: '12:00',
+      venue: 'Hall A',
+      status: Event.EVENT_STATUS.PUBLISHED,
+      enableCertificates: false,
+    });
+
+    const registerRes = await request(app)
+      .post(`/api/tickets/register/${event._id}`)
+      .set(authHeader(student.token));
+
+    expect(registerRes.status).toBe(201);
+
+    const organizerNotifications = await request(app)
+      .get('/api/notifications')
+      .set(authHeader(organizer.token));
+
+    expect(organizerNotifications.status).toBe(200);
+    expect(organizerNotifications.body.data.unreadCount).toBeGreaterThan(0);
+    expect(organizerNotifications.body.data.notifications[0].title).toMatch(/registration|waitlist/i);
+
+    const studentNotifications = await request(app)
+      .get('/api/notifications')
+      .set(authHeader(student.token));
+
+    expect(studentNotifications.status).toBe(200);
+    expect(studentNotifications.body.data.notifications.length).toBeGreaterThan(0);
+
+    const firstNotificationId = studentNotifications.body.data.notifications[0]._id;
+
+    const markReadRes = await request(app)
+      .patch(`/api/notifications/${firstNotificationId}/read`)
+      .set(authHeader(student.token));
+
+    expect(markReadRes.status).toBe(200);
+    expect(markReadRes.body.data.notification.isRead).toBe(true);
+
+    const updateRes = await request(app)
+      .put(`/api/events/${event._id}`)
+      .set(authHeader(organizer.token))
+      .send({
+        venue: 'Hall B',
+        time: '13:00',
+      });
+
+    expect(updateRes.status).toBe(200);
+
+    const eventUpdateNotification = await Notification.findOne({
+      userId: student.user.id,
+      type: 'event_updated',
+    });
+    expect(eventUpdateNotification).toBeTruthy();
   });
 });

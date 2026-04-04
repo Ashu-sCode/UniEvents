@@ -12,6 +12,7 @@ const Attendance = require('../models/Attendance.model');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const fileStorageService = require('./fileStorageService');
 const logger = require('../utils/logger');
+const notificationService = require('./notificationService');
 
 const certificateError = (message, statusCode = 500) => {
   const error = new Error(message);
@@ -210,6 +211,12 @@ const generateSingleCertificate = async (event, user, issuerId) => {
     issuerId: issuerId?.toString?.() || issuerId,
     certificateId: certificate.certificateId,
     fileId: certificate.pdfFileId?.toString?.() || certificate.pdfFileId,
+  });
+
+  await notificationService.notifyCertificateReady({
+    certificate,
+    event,
+    user,
   });
 
   return {

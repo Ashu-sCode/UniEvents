@@ -9,6 +9,7 @@ const Attendance = require('../models/Attendance.model');
 const { generateQRCode } = require('../utils/qrGenerator');
 const { generateTicketPDF } = require('../utils/pdfGenerator');
 const logger = require('../utils/logger');
+const notificationService = require('../services/notificationService');
 
 const promoteNextWaitlistedTicket = async (eventId) => {
   const nextWaitlisted = await Ticket.findOne({
@@ -31,8 +32,14 @@ const promoteNextWaitlistedTicket = async (eventId) => {
     },
   });
 
-  await nextWaitlisted.populate('eventId', 'title date time venue bannerUrl department eventType');
+  await nextWaitlisted.populate('eventId', 'title date time venue bannerUrl department eventType organizerId');
   await nextWaitlisted.populate('userId', 'name rollNumber department email');
+
+  await notificationService.notifyWaitlistPromotion({
+    ticket: nextWaitlisted,
+    event: nextWaitlisted.eventId,
+    organizerId: nextWaitlisted.eventId?.organizerId,
+  });
 
   return nextWaitlisted;
 };
@@ -135,6 +142,22 @@ const registerForEvent = async (req, res, next) => {
           waitlistedAt: { $lte: ticket.waitlistedAt },
         })
       : null;
+
+    await notificationService.notifyOrganizerRegistration({
+      organizerId: event.organizerId,
+      event,
+      student: req.user,
+      registrationType: isWaitlistRegistration ? 'waitlist' : 'confirmed',
+      ticket,
+    });
+
+    await notificationService.notifyStudentRegistration({
+      userId: req.user._id,
+      event,
+      registrationType: isWaitlistRegistration ? 'waitlist' : 'confirmed',
+      waitlistPosition,
+      ticket,
+    });
 
     res.status(201).json({
       success: true,
@@ -370,6 +393,12 @@ const verifyTicket = async (req, res, next) => {
       verifiedBy: req.user._id
     });
 
+    await notificationService.notifyAttendanceMarked({
+      userId: ticket.userId._id,
+      event: ticket.eventId,
+      ticketId: ticket.ticketId,
+    });
+
     logger.info('ticket.verification.succeeded', {
       ...scanContext,
       attendeeId: ticket.userId._id.toString(),
@@ -538,6 +567,12 @@ const cancelTicket = async (req, res, next) => {
     // Cancel the ticket
     ticket.status = Ticket.TICKET_STATUS.CANCELLED;
     await ticket.save();
+
+    await notificationService.notifyTicketCancellation({
+      userId: ticket.userId._id,
+      event,
+      ticket,
+    });
 
     let promotedTicket = null;
 

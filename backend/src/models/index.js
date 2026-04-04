@@ -8,11 +8,13 @@ const Event = require('./Event.model');
 const Ticket = require('./Ticket.model');
 const Attendance = require('./Attendance.model');
 const Certificate = require('./Certificate.model');
+const Notification = require('./Notification.model');
 
 module.exports = {
   User,
   Event,
   Ticket,
   Attendance,
-  Certificate
+  Certificate,
+  Notification
 };

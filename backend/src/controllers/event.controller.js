@@ -8,6 +8,7 @@ const Ticket = require('../models/Ticket.model');
 const { roles } = require('../config/auth.config');
 const certificateService = require('../services/certificateService');
 const imageService = require('../services/imageService');
+const notificationService = require('../services/notificationService');
 
 const normalizeBoolean = (value, fallback) => {
   if (value === undefined) return fallback;
@@ -59,6 +60,19 @@ const promoteWaitlistedTickets = async (eventId) => {
       waitlistCount: -waitlistedTickets.length,
     },
   });
+
+  await Promise.all(
+    waitlistedTickets.map(async (ticket) => {
+      ticket.status = Ticket.TICKET_STATUS.UNUSED;
+      ticket.promotedAt = new Date();
+      await ticket.populate('userId', 'name email rollNumber department');
+      await notificationService.notifyWaitlistPromotion({
+        ticket,
+        event,
+        organizerId: event.organizerId,
+      });
+    })
+  );
 
   return waitlistedTickets.map((ticket) => ticket.ticketId);
 };
@@ -283,6 +297,13 @@ const updateEvent = async (req, res, next) => {
     const newStatus = req.body.status;
     const isCompletingEvent = previousStatus !== 'completed' && newStatus === 'completed';
     const previousSeatLimit = event.seatLimit;
+    const previousSnapshot = {
+      status: event.status,
+      date: event.date?.toISOString?.() || event.date,
+      time: event.time,
+      venue: event.venue,
+      seatLimit: event.seatLimit,
+    };
 
     // Update allowed fields
     const allowedUpdates = [
@@ -356,6 +377,11 @@ const updateEvent = async (req, res, next) => {
       promotedTicketIds = await promoteWaitlistedTickets(event._id);
       event = await Event.findById(event._id);
     }
+
+    await notificationService.notifyEventAudience({
+      event,
+      previous: previousSnapshot,
+    });
 
     // Auto-generate certificates if event is being marked as completed
     let certificateResult = null;
