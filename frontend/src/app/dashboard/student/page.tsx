@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
+import { NotificationBell } from '@/components/NotificationBell';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
 import { AsyncImage, LoadingGrid, SectionLoader } from '@/components/ui';
 import { STREAM_OPTIONS } from '@/constants/streams';
@@ -422,6 +423,7 @@ export default function StudentDashboard() {
               <span className="text-sm text-neutral-600">
                 <strong className="text-neutral-900">{user?.name}</strong>
               </span>
+              <NotificationBell />
               <button
                 onClick={() => router.push('/dashboard/student/profile')}
                 className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-700"

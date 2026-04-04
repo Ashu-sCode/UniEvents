@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Ticket, ArrowLeft, LogOut, UserCircle } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 import ProfileForm from '@/components/ProfileForm';
 import { useAuth } from '@/context/AuthContext';
 
@@ -36,6 +37,7 @@ export default function OrganizerProfilePage() {
                 <strong className="text-neutral-900">{user?.name}</strong> • {user?.department}
               </span>
 
+              <NotificationBell />
               <button
                 onClick={() => router.push('/dashboard/organizer/profile')}
                 className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-700"

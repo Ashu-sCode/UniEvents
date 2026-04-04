@@ -11,6 +11,8 @@ import type {
   EventFormInput,
   EventsPayload,
   LoginInput,
+  Notification,
+  NotificationsPayload,
   OrganizerAnalyticsSummary,
   PaginatedResponse,
   RegisterTicketPayload,
@@ -179,4 +181,13 @@ export const usersAPI = {
     }
     return api.put('/users/me', data);
   },
+};
+
+export const notificationsAPI = {
+  getAll: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<NotificationsPayload>> =>
+    api.get('/notifications', { params }),
+  markRead: (id: string): Promise<ApiResult<{ notification: Notification }>> =>
+    api.patch(`/notifications/${id}/read`),
+  markAllRead: (): Promise<ApiResult<Record<string, never>>> =>
+    api.patch('/notifications/read-all'),
 };

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { Event, EventStatus, EventType, OrganizerAnalyticsSummary } from '@/types';
 import CameraScan from '@/components/CameraScan';
+import { NotificationBell } from '@/components/NotificationBell';
 import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { AsyncImage, Button } from '@/components/ui';
@@ -153,6 +154,7 @@ export default function OrganizerDashboard() {
               <span className="text-sm text-neutral-600">
                 <strong className="text-neutral-900">{user?.name}</strong> • {user?.department}
               </span>
+              <NotificationBell />
               <button
                 onClick={() => router.push('/dashboard/organizer/profile')}
                 className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-700"

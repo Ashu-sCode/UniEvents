@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProvider } from '@/context/AuthContext';
+import { NotificationProvider } from '@/context/NotificationContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { LoadingProvider } from '@/context/LoadingContext';
 import { GlobalLoader } from '@/components/GlobalLoader';
@@ -25,8 +26,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ToastProvider>
         <LoadingProvider>
           <AuthProvider>
-            {children}
-            <GlobalLoader />
+            <NotificationProvider>
+              {children}
+              <GlobalLoader />
+            </NotificationProvider>
           </AuthProvider>
         </LoadingProvider>
       </ToastProvider>

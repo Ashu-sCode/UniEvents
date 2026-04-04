@@ -16,6 +16,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { attendanceAPI } from '@/lib/api';
@@ -172,9 +173,10 @@ export default function OrganizerAnalyticsPage() {
             <span className="hidden text-sm text-slate-600 md:block">
               <strong className="text-slate-900">{user?.name}</strong> • {user?.department}
             </span>
-            <button
-              onClick={() => router.push('/dashboard/organizer/profile')}
-              className="rounded-xl p-2 text-slate-700 transition hover:bg-slate-100"
+              <NotificationBell />
+              <button
+                onClick={() => router.push('/dashboard/organizer/profile')}
+                className="rounded-xl p-2 text-slate-700 transition hover:bg-slate-100"
               aria-label="Profile"
               title="Profile"
             >

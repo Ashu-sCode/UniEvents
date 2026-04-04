@@ -134,6 +134,31 @@ export interface OrganizerAnalyticsSummary {
   needsAttention: OrganizerEventSummary | null;
 }
 
+export type NotificationType =
+  | 'registration_confirmed'
+  | 'waitlist_joined'
+  | 'waitlist_promoted'
+  | 'registration_cancelled'
+  | 'event_updated'
+  | 'event_cancelled'
+  | 'event_published'
+  | 'certificate_ready'
+  | 'attendance_marked';
+
+export interface Notification {
+  _id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link?: string | null;
+  isRead: boolean;
+  readAt?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Certificate types
 export interface Certificate {
   _id: string;
@@ -211,6 +236,11 @@ export interface CertificatesPayload {
 
 export interface RegistrationsPayload {
   registrations: Ticket[];
+}
+
+export interface NotificationsPayload {
+  notifications: Notification[];
+  unreadCount: number;
 }
 
 export interface EventCertificatesPayload {
