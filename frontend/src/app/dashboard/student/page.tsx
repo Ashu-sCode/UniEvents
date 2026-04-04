@@ -8,13 +8,13 @@ import { useApi } from '@/hooks/useApi';
 import { eventsAPI, ticketsAPI, certificatesAPI } from '@/lib/api';
 import { formatDate, getStatusColor, downloadBlob, getImageUrl } from '@/lib/utils';
 import {
-  Calendar, Ticket, Award, LogOut,
+  Calendar, Ticket, Award,
   MapPin, Clock, Users, Download, FileText, Eye,
-  ChevronRight, UserCircle, Search, Filter
+  ChevronDown, ChevronRight, Search, Filter
 } from 'lucide-react';
 import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
-import { NotificationBell } from '@/components/NotificationBell';
+import { DashboardNavbar } from '@/components/DashboardNavbar';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
 import { AsyncImage, LoadingGrid, SectionLoader } from '@/components/ui';
 import { STREAM_OPTIONS } from '@/constants/streams';
@@ -24,7 +24,7 @@ const SEEN_PROMOTION_STORAGE_KEY = 'unievent.student.seenPromotions';
 
 export default function StudentDashboard() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
@@ -415,43 +415,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dbeafe_0%,transparent_28%),radial-gradient(circle_at_top_right,#e0f2fe_0%,transparent_26%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_45%,#f8fafc_100%)]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/70 bg-white/85 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2.5">
-              <div className="rounded-2xl bg-neutral-900 p-2 text-white shadow-sm">
-                <Ticket className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-neutral-500">Student Dashboard</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="hidden rounded-full border border-neutral-200 bg-white px-3 py-1 text-sm text-neutral-600 sm:inline-flex">
-                <strong className="text-neutral-900">{user?.name}</strong>
-              </span>
-              <NotificationBell />
-              <button
-                onClick={() => router.push('/dashboard/student/profile')}
-                className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-700"
-                aria-label="Profile"
-                title="Profile"
-              >
-                <UserCircle className="h-5 w-5" />
-              </button>
-              <button
-                onClick={logout}
-                className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <DashboardNavbar role="student" title="Student Dashboard" subtitle="Browse events, tickets, waitlists, and certificates" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_55%,#334155_100%)] px-6 py-8 text-white shadow-[0_20px_70px_rgba(15,23,42,0.14)] sm:px-8">
@@ -556,7 +520,8 @@ export default function StudentDashboard() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {/* Search & filters */}
             <div className="md:col-span-2 lg:col-span-3 mb-2">
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col gap-3 rounded-[1.6rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur sm:p-5">
+                <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                   <input
@@ -566,19 +531,20 @@ export default function StudentDashboard() {
                       setEventSearchInput(e.target.value);
                     }}
                     placeholder="Search events…"
-                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    className="w-full rounded-2xl border border-neutral-200/80 bg-white px-10 py-3 text-sm text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70"
                   />
                 </div>
 
-                <div className="relative">
+                <div className="relative sm:min-w-[11rem]">
                   <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                   <select
                     value={eventType}
                     onChange={(e) => {
                       setEventsPage(1);
                       setEventType(e.target.value as any);
                     }}
-                    className="appearance-none w-full sm:w-auto pl-10 pr-10 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    className="w-full appearance-none rounded-2xl border border-neutral-200/80 bg-white px-10 py-3 text-sm font-medium text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70"
                   >
                     <option value="all">All Types</option>
                     <option value="public">Public</option>
@@ -586,14 +552,16 @@ export default function StudentDashboard() {
                   </select>
                 </div>
 
-                <div className="w-full sm:w-64">
+                <div className="relative w-full sm:w-64">
+                  <Users className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                   <select
                     value={eventDepartment}
                     onChange={(e) => {
                       setEventsPage(1);
                       setEventDepartment(e.target.value);
                     }}
-                    className="input"
+                    className="w-full appearance-none rounded-2xl border border-neutral-200/80 bg-white px-10 py-3 text-sm font-medium text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70"
                   >
                     <option value="">All Departments</option>
                     {STREAM_OPTIONS.map((stream) => (
@@ -604,7 +572,8 @@ export default function StudentDashboard() {
                   </select>
                 </div>
 
-                <div className="w-full sm:w-52">
+                <div className="relative w-full sm:w-52">
+                  <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                   <input
                     type="date"
                     value={dateFrom}
@@ -612,12 +581,14 @@ export default function StudentDashboard() {
                       setEventsPage(1);
                       setDateFrom(e.target.value);
                     }}
-                    className="input"
+                    className="w-full rounded-2xl border border-neutral-200/80 bg-white px-10 py-3 text-sm font-medium text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70"
                     title="From date"
+                    aria-label="From date"
                   />
                 </div>
 
-                <div className="w-full sm:w-52">
+                <div className="relative w-full sm:w-52">
+                  <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                   <input
                     type="date"
                     value={dateTo}
@@ -625,21 +596,23 @@ export default function StudentDashboard() {
                       setEventsPage(1);
                       setDateTo(e.target.value);
                     }}
-                    className="input"
+                    className="w-full rounded-2xl border border-neutral-200/80 bg-white px-10 py-3 text-sm font-medium text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70"
                     title="To date"
+                    aria-label="To date"
                   />
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-neutral-500">
-                <span>Filters are saved on this device.</span>
-                {hasActiveEventFilters && (
-                  <button
-                    onClick={clearEventFilters}
-                    className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-neutral-700 hover:bg-neutral-100"
-                  >
-                    Clear filters
-                  </button>
-                )}
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-sm text-neutral-500">
+                  <span>Filters are saved on this device.</span>
+                  {hasActiveEventFilters && (
+                    <button
+                      onClick={clearEventFilters}
+                      className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 

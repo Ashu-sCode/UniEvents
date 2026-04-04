@@ -2,20 +2,19 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useApi } from '@/hooks/useApi';
 import { eventsAPI, ticketsAPI } from '@/lib/api';
 import { formatDate, getStatusColor, getImageUrl, isValidImageType } from '@/lib/utils';
 import {
-  Calendar, Ticket, Users, LogOut, Plus,
+  Calendar, Ticket, Users, Plus,
   QrCode, CheckCircle, XCircle,
   BarChart3, Eye, Camera, Keyboard, Award, Upload, X,
-  Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin, UserCircle
+  Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin
 } from 'lucide-react';
 import type { Event, EventStatus, EventType } from '@/types';
 import CameraScan from '@/components/CameraScan';
-import { NotificationBell } from '@/components/NotificationBell';
+import { DashboardNavbar } from '@/components/DashboardNavbar';
 import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { AsyncImage, Button } from '@/components/ui';
@@ -25,7 +24,6 @@ const ORGANIZER_FILTERS_STORAGE_KEY = 'unievent.organizer.filters';
 
 export default function OrganizerDashboard() {
   const router = useRouter();
-  const { user, logout } = useAuth();
   const toast = useToast();
   const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
@@ -128,43 +126,7 @@ export default function OrganizerDashboard() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dcfce7_0%,transparent_24%),radial-gradient(circle_at_top_right,#dbeafe_0%,transparent_24%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_45%,#f8fafc_100%)]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/70 bg-white/85 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2.5">
-              <div className="rounded-2xl bg-neutral-900 p-2 text-white shadow-sm">
-                <Ticket className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-neutral-500">Organizer Dashboard</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-neutral-600">
-                <strong className="text-neutral-900">{user?.name}</strong> · {user?.department}
-              </span>
-              <NotificationBell />
-              <button
-                onClick={() => router.push('/dashboard/organizer/profile')}
-                className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-700"
-                aria-label="Profile"
-                title="Profile"
-              >
-                <UserCircle className="h-5 w-5" />
-              </button>
-              <button
-                onClick={logout}
-                className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <DashboardNavbar role="organizer" title="Operations Dashboard" subtitle="Manage events, registrations, and live activity" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,#0f172a_0%,#1f2937_45%,#14532d_100%)] px-6 py-8 text-white shadow-[0_20px_70px_rgba(15,23,42,0.14)] sm:px-8">
@@ -244,13 +206,13 @@ export default function OrganizerDashboard() {
         </div>
 
         {/* Filter & Sort Controls */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4 rounded-[1.75rem] border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur">
+        <div className="mb-4 flex flex-col gap-3 rounded-[1.75rem] border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:p-5">
           {/* Status Filter */}
           <div className="relative">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="appearance-none w-full sm:w-auto pl-10 pr-10 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent cursor-pointer"
+              className="w-full cursor-pointer appearance-none rounded-2xl border border-neutral-200/80 bg-white px-10 py-3 text-sm font-medium text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70 sm:w-auto"
             >
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
@@ -267,7 +229,7 @@ export default function OrganizerDashboard() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none w-full sm:w-auto pl-10 pr-10 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent cursor-pointer"
+              className="w-full cursor-pointer appearance-none rounded-2xl border border-neutral-200/80 bg-white px-10 py-3 text-sm font-medium text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70 sm:w-auto"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -279,7 +241,7 @@ export default function OrganizerDashboard() {
           </div>
 
           {/* Results count */}
-          <div className="flex items-center text-sm text-neutral-500 sm:ml-auto">
+          <div className="flex items-center rounded-full border border-neutral-200/80 bg-white px-3.5 py-2 text-sm text-neutral-500 sm:ml-auto">
             Showing {filteredEvents.length} of {events.length} events
           </div>
         </div>
@@ -292,7 +254,7 @@ export default function OrganizerDashboard() {
                 setStatusFilter('all');
                 setSortBy('newest');
               }}
-              className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-neutral-700 hover:bg-neutral-100"
+              className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100"
             >
               Clear filters
             </button>
@@ -964,7 +926,7 @@ function QRScanModal({ event, onClose }: any) {
 
   const handleVerify = async (id: string) => {
     const cleanId = id.trim();
-    if (!cleanId) return;
+    if (!cleanId) return null;
     
     setIsVerifying(true);
     setResult(null);
@@ -974,22 +936,51 @@ function QRScanModal({ event, onClose }: any) {
         ticketId: cleanId,
         eventId: event._id,
       });
-      setResult({ success: true, data: response.data });
+      const nextResult = { success: true, data: response.data };
+      setResult(nextResult);
+      return nextResult;
     } catch (error: any) {
-      setResult({ 
+      const nextResult = { 
         success: false, 
         message: error.response?.data?.message || 'Verification failed',
         verification: error.response?.data?.verification
-      });
+      };
+      setResult(nextResult);
+      return nextResult;
     } finally {
       setIsVerifying(false);
       setTicketId('');
     }
   };
 
-  const handleScanResult = (scannedId: string) => {
-    setMode('choose');
-    handleVerify(scannedId);
+  const handleScanResult = async (scannedId: string) => {
+    const outcome = await handleVerify(scannedId) as
+      | { success: true; data: { verification?: { attendee?: { name?: string; rollNumber?: string; department?: string } } } }
+      | { success: false; message?: string; verification?: { reason?: string } }
+      | null;
+
+    if (outcome?.success) {
+      const attendee = outcome.data?.verification?.attendee;
+      return {
+        success: true,
+        title: 'Entry verified',
+        message: attendee?.name
+          ? `${attendee.name} has been checked in successfully.`
+          : 'Ticket accepted and attendance recorded successfully.',
+        details: attendee
+          ? `${attendee.rollNumber || 'Roll number unavailable'} · ${attendee.department || 'Department unavailable'} · Student notified`
+          : 'Attendance saved and the student has been notified.',
+      };
+    }
+
+    return {
+      success: false,
+      title: 'Verification failed',
+      message: outcome?.message || 'Verification failed',
+      details: outcome?.verification?.reason
+        ? `Reason: ${String(outcome.verification.reason).replaceAll('_', ' ')}`
+        : 'Check the ticket and try again.',
+    };
   };
 
   // Show Camera Scanner
@@ -997,7 +988,7 @@ function QRScanModal({ event, onClose }: any) {
     return (
       <CameraScan
         onScan={handleScanResult}
-        onClose={() => setMode('choose')}
+        onClose={onClose}
       />
     );
   }

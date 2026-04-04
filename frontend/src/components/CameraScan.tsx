@@ -1,210 +1,68 @@
-"use client";
+'use client';
 
-import React, { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 import {
-  X,
   AlertCircle,
-  RefreshCw,
   CheckCircle,
   Flashlight,
-} from "lucide-react";
+  RefreshCw,
+  ScanLine,
+  X,
+  XCircle,
+} from 'lucide-react';
+
+type ScanStatus = 'starting' | 'scanning' | 'processing' | 'success' | 'error';
+
+export type ScanFeedback = {
+  success: boolean;
+  title: string;
+  message: string;
+  details?: string;
+};
 
 interface CameraScanProps {
-  onScan: (ticketId: string) => void;
+  onScan: (ticketId: string) => Promise<ScanFeedback>;
   onClose: () => void;
 }
 
-type ScanStatus = "starting" | "scanning" | "success" | "error";
-
 export default function CameraScan({ onScan, onClose }: CameraScanProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<ScanStatus>("starting");
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [status, setStatus] = useState<ScanStatus>('starting');
   const [torchOn, setTorchOn] = useState(false);
+  const [feedback, setFeedback] = useState<ScanFeedback | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const hasStartedRef = useRef(false);
+  const isHandlingScanRef = useRef(false);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
 
-  // 🔊 Beep sound
   const playBeep = () => {
     try {
-      const ctx = new (
-        window.AudioContext || (window as any).webkitAudioContext
-      )();
-      const oscillator = ctx.createOscillator();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(1000, ctx.currentTime);
-      oscillator.connect(ctx.destination);
+      const context = new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+      const oscillator = context.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(1040, context.currentTime);
+      oscillator.connect(context.destination);
       oscillator.start();
-      setTimeout(() => oscillator.stop(), 120);
-    } catch {}
+      window.setTimeout(() => oscillator.stop(), 120);
+    } catch {
+      // Non-blocking audio enhancement only.
+    }
   };
 
-  // ✅ FIXED useEffect (NO async return)
-  useEffect(() => {
-    let isMounted = true;
+  const extractTicketId = (decodedText: string) => {
+    let ticketId = decodedText;
 
-    (async () => {
-      if (!isMounted) return;
-      await startCamera();
-    })();
-
-    return () => {
-      isMounted = false;
-      // ⚠️ DO NOT return promise
-      stopScanner().catch(() => {});
-    };
-  }, []);
-
-const startCamera = async () => {
-  console.log("🎥 startCamera called");
-
-  if (hasStartedRef.current) {
-    console.log("⚠️ Scanner already started, skipping");
-    return;
-  }
-
-  hasStartedRef.current = true;
-
-  setError(null);
-  setStatus("starting");
-
-  await new Promise((r) => setTimeout(r, 100));
-
-  try {
-    console.log("📷 Creating Html5Qrcode instance...");
-    scannerRef.current = new Html5Qrcode("qr-reader");
-
-    const config = {
-      fps: 12,
-      qrbox: { width: 240, height: 240 },
-      aspectRatio: 1.0,
-    };
-
-    console.log("⚙️ Config:", config);
-
-    // 🔥 CAMERA START WITH FALLBACKS
-    try {
-      console.log("📷 Trying BACK camera (environment)...");
-      await scannerRef.current.start(
-        { facingMode: "environment" },
-        config,
-        handleScanSuccess,
-        () => {}
-      );
-    } catch (err) {
-      console.warn("⚠️ Back camera failed:", err);
-
-      try {
-        console.log("🤳 Trying FRONT camera (user)...");
-        await scannerRef.current.start(
-          { facingMode: "user" },
-          config,
-          handleScanSuccess,
-          () => {}
-        );
-      } catch (err2) {
-        console.warn("⚠️ Front camera failed:", err2);
-
-        console.log("🔍 Getting available cameras...");
-        const devices = await Html5Qrcode.getCameras();
-
-        console.log("📱 Available cameras:", devices);
-
-        if (devices && devices.length > 0) {
-          console.log("🎯 Using first available camera:", devices[0]);
-
-          await scannerRef.current.start(
-            devices[0].id,
-            config,
-            handleScanSuccess,
-            () => {}
-          );
-        } else {
-          throw new Error("❌ No cameras found on device");
-        }
-      }
+    if (decodedText.includes('/')) {
+      ticketId = decodedText.split('/').pop() || decodedText;
     }
 
-    console.log("✅ Camera started successfully");
-
-    // 🎥 Get video track safely
-    const video = document.querySelector(
-      "#qr-reader video"
-    ) as HTMLVideoElement | null;
-
-    console.log("📺 Video element:", video);
-
-    if (video && video.srcObject instanceof MediaStream) {
-      const stream = video.srcObject;
-      const track = stream.getVideoTracks()[0];
-      videoTrackRef.current = track;
-
-      console.log("🎬 Video track:", track);
-
-      const capabilities: any = track.getCapabilities?.();
-      console.log("🔍 Capabilities:", capabilities);
-
-      // 🔦 Torch auto-enable (safe)
-      if (capabilities?.torch) {
-        console.log("🔦 Torch supported, enabling...");
-
-        try {
-          await (track as any).applyConstraints({
-            advanced: [{ torch: true }],
-          });
-
-          setTorchOn(true);
-          console.log("✅ Torch enabled");
-        } catch (e) {
-          console.warn("⚠️ Torch enable failed:", e);
-        }
-      } else {
-        console.log("⚠️ Torch not supported");
-      }
-    } else {
-      console.warn("⚠️ Video or stream not ready");
+    if (ticketId.includes('?')) {
+      ticketId = ticketId.split('?')[0];
     }
 
-    setStatus("scanning");
-  } catch (err: any) {
-    console.error("❌ CAMERA START ERROR FULL:", err);
-
-    hasStartedRef.current = false; // 🔥 IMPORTANT
-
-    setStatus("error");
-
-    let msg = "Could not access camera. ";
-
-    if (err?.message) console.log("Error message:", err.message);
-
-    if (err.message?.includes("Permission")) {
-      msg += "Allow camera permission.";
-    } else if (err.message?.includes("NotFound")) {
-      msg += "No camera found.";
-    } else if (err.message?.includes("NotReadable")) {
-      msg += "Camera is in use.";
-    } else {
-      msg += "Unknown error.";
-    }
-
-    setError(msg);
-  }
-};
-
-  const toggleTorch = async () => {
-    const track = videoTrackRef.current;
-    if (!track) return;
-
-    try {
-      await track.applyConstraints({
-        advanced: [{ torch: !torchOn }],
-      });
-      setTorchOn(!torchOn);
-    } catch {
-      alert("Torch not supported");
-    }
+    return ticketId.trim();
   };
 
   const stopScanner = async () => {
@@ -215,106 +73,265 @@ const startCamera = async () => {
         if (scannerRef.current.getState() === 2) {
           await scannerRef.current.stop();
         }
-        scannerRef.current.clear();
-      } catch {}
+        await scannerRef.current.clear();
+      } catch {
+        // Scanner may already be stopped or cleared.
+      }
       scannerRef.current = null;
     }
+
+    videoTrackRef.current = null;
+    setTorchOn(false);
   };
 
-  const handleScanSuccess = (decodedText: string) => {
-    stopScanner();
-    setStatus("success");
+  const startCamera = async () => {
+    if (hasStartedRef.current) {
+      return;
+    }
 
+    hasStartedRef.current = true;
+    isHandlingScanRef.current = false;
+    setCameraError(null);
+    setFeedback(null);
+    setStatus('starting');
+
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
+
+    try {
+      const scanner = new Html5Qrcode('qr-reader');
+      scannerRef.current = scanner;
+
+      const config = {
+        fps: 12,
+        qrbox: { width: 240, height: 240 },
+        aspectRatio: 1,
+      };
+
+      try {
+        await scanner.start({ facingMode: 'environment' }, config, handleScanSuccess, () => {});
+      } catch {
+        try {
+          await scanner.start({ facingMode: 'user' }, config, handleScanSuccess, () => {});
+        } catch {
+          const cameras = await Html5Qrcode.getCameras();
+
+          if (!cameras.length) {
+            throw new Error('No camera found');
+          }
+
+          await scanner.start(cameras[0].id, config, handleScanSuccess, () => {});
+        }
+      }
+
+      const video = document.querySelector('#qr-reader video') as HTMLVideoElement | null;
+      if (video?.srcObject instanceof MediaStream) {
+        const track = video.srcObject.getVideoTracks()[0];
+        videoTrackRef.current = track;
+
+        const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
+        if (capabilities?.torch) {
+          try {
+            await track.applyConstraints({ advanced: [{ torch: true }] });
+            setTorchOn(true);
+          } catch {
+            // Torch support is optional.
+          }
+        }
+      }
+
+      setStatus('scanning');
+    } catch (error: unknown) {
+      hasStartedRef.current = false;
+      setStatus('error');
+
+      const message =
+        error instanceof Error && error.message.includes('Permission')
+          ? 'Allow camera access to continue scanning.'
+          : error instanceof Error && error.message.includes('No camera')
+            ? 'No camera was found on this device.'
+            : error instanceof Error && error.message.includes('NotReadable')
+              ? 'This camera is already in use by another app.'
+              : 'Unable to start the scanner right now.';
+
+      setCameraError(message);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (mounted) {
+      void startCamera();
+    }
+
+    return () => {
+      mounted = false;
+      void stopScanner();
+    };
+  }, []);
+
+  const handleScanSuccess = async (decodedText: string) => {
+    if (isHandlingScanRef.current) {
+      return;
+    }
+
+    isHandlingScanRef.current = true;
+    setFeedback(null);
+    setStatus('processing');
     playBeep();
 
-    let ticketId = decodedText;
+    const ticketId = extractTicketId(decodedText);
+    await stopScanner();
 
-    if (decodedText.includes("/")) {
-      ticketId = decodedText.split("/").pop() || decodedText;
+    try {
+      const result = await onScan(ticketId);
+      setFeedback(result);
+      setStatus(result.success ? 'success' : 'error');
+    } catch {
+      setFeedback({
+        success: false,
+        title: 'Verification failed',
+        message: 'Something went wrong while verifying this ticket.',
+      });
+      setStatus('error');
+    } finally {
+      isHandlingScanRef.current = false;
     }
-
-    if (ticketId.includes("?")) {
-      ticketId = ticketId.split("?")[0];
-    }
-
-    setTimeout(() => {
-      onScan(ticketId.trim());
-    }, 500);
   };
 
-  const handleRetry = () => {
-    stopScanner().then(() => startCamera());
+  const toggleTorch = async () => {
+    const track = videoTrackRef.current;
+    if (!track) return;
+
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !torchOn }] });
+      setTorchOn((prev) => !prev);
+    } catch {
+      setFeedback({
+        success: false,
+        title: 'Torch unavailable',
+        message: 'This device does not support flashlight control in the scanner.',
+      });
+      setStatus('error');
+    }
   };
 
-  const handleClose = () => {
-    stopScanner().then(() => onClose());
+  const handleRetry = async () => {
+    await stopScanner();
+    void startCamera();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/90 backdrop-blur-lg"
-        onClick={handleClose}
-      />
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-lg" onClick={onClose} />
 
-      <div className="relative w-full max-w-md">
-        <button
-          onClick={handleClose}
-          className="absolute -top-12 right-0 text-white"
-        >
-          <X />
-        </button>
+      <div className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/15 bg-neutral-950 text-white shadow-[0_30px_100px_rgba(0,0,0,0.45)]">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Live check-in</p>
+            <h2 className="mt-1 text-lg font-semibold text-white">Scan attendee ticket</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
+            aria-label="Close scanner"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-        <div className="bg-neutral-900 border border-white/20 rounded-2xl p-4">
-          <h2 className="text-white text-center text-lg mb-4">Scan QR Code</h2>
+        <div className="p-5">
+          <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-black/40">
+            <div id="qr-reader" className="aspect-square w-full overflow-hidden" />
 
-          <div className="relative">
-            <div
-              id="qr-reader"
-              className="w-full aspect-square rounded-2xl overflow-hidden"
-            />
-
-            {/* Torch */}
-            {videoTrackRef.current && (
+            {videoTrackRef.current && status === 'scanning' ? (
               <button
                 onClick={toggleTorch}
-                className={`absolute top-3 right-3 p-2 rounded-full ${
+                className={`absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full border transition ${
                   torchOn
-                    ? "bg-yellow-400 text-black"
-                    : "bg-black/60 text-white"
+                    ? 'border-yellow-300/50 bg-yellow-400 text-black'
+                    : 'border-white/15 bg-black/45 text-white'
                 }`}
+                aria-label="Toggle flashlight"
               >
-                <Flashlight className="w-5 h-5" />
+                <Flashlight className="h-5 w-5" />
               </button>
-            )}
+            ) : null}
 
-            {/* Success */}
-            {status === "success" && (
-              <div className="absolute inset-0 flex items-center justify-center bg-green-500/30 rounded-2xl animate-pulse">
-                <CheckCircle className="text-white w-16 h-16" />
+            {status === 'scanning' && !feedback ? (
+              <div className="pointer-events-none absolute inset-x-6 top-6 rounded-full border border-emerald-300/15 bg-black/40 px-4 py-2 text-center text-sm font-medium text-emerald-100 backdrop-blur">
+                Align the QR code inside the frame to verify entry.
+              </div>
+            ) : null}
+
+            {(status === 'starting' || status === 'processing') && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60">
+                <RefreshCw className="h-9 w-9 animate-spin text-white" />
+                <p className="text-sm font-medium text-slate-200">
+                  {status === 'starting' ? 'Starting camera...' : 'Verifying ticket...'}
+                </p>
               </div>
             )}
 
-            {/* Loading */}
-            {status === "starting" && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl">
-                <RefreshCw className="animate-spin text-white w-8 h-8" />
+            {feedback && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/65 p-5">
+                <div
+                  className={`w-full rounded-[1.5rem] border p-5 shadow-xl ${
+                    feedback.success
+                      ? 'border-emerald-300/20 bg-emerald-500/12'
+                      : 'border-rose-300/20 bg-rose-500/12'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {feedback.success ? (
+                      <CheckCircle className="mt-0.5 h-7 w-7 shrink-0 text-emerald-300" />
+                    ) : (
+                      <XCircle className="mt-0.5 h-7 w-7 shrink-0 text-rose-300" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-lg font-semibold text-white">{feedback.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-200">{feedback.message}</p>
+                      {feedback.details ? (
+                        <p className="mt-2 text-sm text-slate-300">{feedback.details}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                    <button
+                      onClick={handleRetry}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-neutral-900 transition hover:bg-neutral-100"
+                    >
+                      <ScanLine className="h-4 w-4" />
+                      Scan next ticket
+                    </button>
+                    <button
+                      onClick={onClose}
+                      className="inline-flex flex-1 items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          {error && (
-            <div className="mt-4 bg-red-500/10 p-3 rounded-xl text-sm text-red-400">
-              <div className="flex gap-2">
-                <AlertCircle />
-                <span>{error}</span>
+          {cameraError && (
+            <div className="mt-4 rounded-[1.25rem] border border-rose-300/20 bg-rose-500/10 p-4">
+              <div className="flex gap-3">
+                <AlertCircle className="h-5 w-5 shrink-0 text-rose-300" />
+                <div>
+                  <p className="font-medium text-white">Camera unavailable</p>
+                  <p className="mt-1 text-sm text-slate-200">{cameraError}</p>
+                </div>
               </div>
-
               <button
                 onClick={handleRetry}
-                className="mt-2 px-3 py-1 bg-white text-black rounded"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-100"
               >
-                Retry
+                <RefreshCw className="h-4 w-4" />
+                Retry scanner
               </button>
             </div>
           )}
@@ -323,7 +340,7 @@ const startCamera = async () => {
 
       <style jsx global>{`
         #qr-reader video {
-          border-radius: 16px !important;
+          border-radius: 24px !important;
           object-fit: cover;
         }
         #qr-reader__dashboard {

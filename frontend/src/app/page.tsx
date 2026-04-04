@@ -77,22 +77,50 @@ export default function Home() {
         Skip to main content
       </a>
 
-      <header className="sticky top-0 z-50 border-b border-white/60 bg-white/90 backdrop-blur-sm">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8" aria-label="Primary">
-          <div className="flex items-center gap-2.5">
-            <Ticket className="h-7 w-7 text-neutral-800" aria-hidden="true" />
-            <span className="text-xl font-semibold tracking-tight">UniEvent</span>
+      <header className="relative z-20 px-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-4">
+        <nav
+          className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 rounded-[1.75rem] border border-white/70 bg-white/78 px-4 py-3 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:px-5"
+          aria-label="Primary"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#0f172a_0%,#111827_100%)] text-white shadow-sm">
+              <Ticket className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-lg font-semibold tracking-tight text-neutral-950">UniEvent</span>
+                <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-600">
+                  Campus
+                </span>
+              </div>
+              <p className="truncate text-xs text-neutral-500">Events, tickets, attendance, and certificates</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-[1.1rem] border border-neutral-200/80 bg-neutral-50/90 p-1.5 md:flex">
+              <a
+                href="#capabilities"
+                className="rounded-[0.9rem] px-3 py-2 text-sm font-medium text-neutral-600 transition hover:bg-white hover:text-neutral-900"
+              >
+                Capabilities
+              </a>
+              <a
+                href="#get-started"
+                className="rounded-[0.9rem] px-3 py-2 text-sm font-medium text-neutral-600 transition hover:bg-white hover:text-neutral-900"
+              >
+                Get Started
+              </a>
+            </div>
+
             <Link
               href="/login"
-              className="rounded-xl px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:text-neutral-900"
+              className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900"
             >
               Login
             </Link>
             <Link href="/signup" aria-label="Create a new UniEvent account">
-              <Button>Sign Up</Button>
+              <Button className="rounded-full px-5">Sign Up</Button>
             </Link>
           </div>
         </nav>
@@ -189,7 +217,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section id="capabilities" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="rounded-[2rem] border border-neutral-200 bg-white/90 p-6 shadow-sm sm:p-8">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-neutral-500">Core capabilities</p>
@@ -215,7 +243,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <section id="get-started" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-6 rounded-[2rem] border border-neutral-200 bg-white p-8 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-neutral-500">Get started</p>

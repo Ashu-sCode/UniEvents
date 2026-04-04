@@ -1,23 +1,17 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Award,
   BarChart3,
   Calendar,
   CheckCircle2,
-  LogOut,
-  Ticket,
   TrendingUp,
-  UserCircle,
   Users,
   XCircle,
 } from 'lucide-react';
-import { NotificationBell } from '@/components/NotificationBell';
-import { useAuth } from '@/context/AuthContext';
+import { DashboardNavbar } from '@/components/DashboardNavbar';
 import { useToast } from '@/context/ToastContext';
 import { attendanceAPI } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
@@ -80,8 +74,6 @@ function getAccentTheme(index: number): AccentTheme {
 }
 
 export default function OrganizerAnalyticsPage() {
-  const router = useRouter();
-  const { user, logout } = useAuth();
   const toast = useToast();
   const [summary, setSummary] = useState<OrganizerAnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -151,47 +143,7 @@ export default function OrganizerAnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#e0f2fe_0%,transparent_28%),radial-gradient(circle_at_top_right,#ede9fe_0%,transparent_30%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)]">
-      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/dashboard/organizer')}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Dashboard
-            </button>
-            <div className="flex items-center gap-2.5">
-              <Ticket className="h-7 w-7 text-slate-700" />
-              <div>
-                <p className="text-xl font-semibold text-slate-900">Organizer Analytics</p>
-                <p className="text-xs text-slate-500">Visual performance overview across all events</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="hidden text-sm text-slate-600 md:block">
-              <strong className="text-slate-900">{user?.name}</strong> • {user?.department}
-            </span>
-              <NotificationBell />
-              <button
-                onClick={() => router.push('/dashboard/organizer/profile')}
-                className="rounded-xl p-2 text-slate-700 transition hover:bg-slate-100"
-              aria-label="Profile"
-              title="Profile"
-            >
-              <UserCircle className="h-5 w-5" />
-            </button>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <DashboardNavbar role="organizer" title="Analytics Workspace" subtitle="Cross-event performance and attendance insights" />
 
       <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <section className="mb-8 grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
@@ -454,7 +406,7 @@ function SpotlightCard({
         <>
           <p className="mt-3 text-lg font-semibold text-slate-900">{event.title}</p>
           <p className="mt-1 text-sm text-slate-500">
-            {event.department} • {event.eventType} • {formatDate(event.date)}
+            {event.department} â€¢ {event.eventType} â€¢ {formatDate(event.date)}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Badge>{event.attendanceRate} attendance</Badge>
@@ -514,7 +466,7 @@ function RateBarRow({ event, accent }: { event: OrganizerEventSummary; accent: A
         <div>
           <p className="font-medium text-slate-900">{event.title}</p>
           <p className="text-sm text-slate-500">
-            {event.department} • {event.registeredCount} registered • {event.attendedCount} attended
+            {event.department} â€¢ {event.registeredCount} registered â€¢ {event.attendedCount} attended
           </p>
         </div>
         <MetricTooltip
@@ -615,7 +567,7 @@ function DepartmentRow({
         <div>
           <p className="font-semibold text-slate-900">{summary.department}</p>
           <p className="text-sm text-slate-600">
-            {summary.events} events • {summary.attendance} attendees • {summary.certificates} certificates
+            {summary.events} events â€¢ {summary.attendance} attendees â€¢ {summary.certificates} certificates
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -673,7 +625,7 @@ function ComparisonCard({ event, accent }: { event: OrganizerEventSummary; accen
             {event.enableCertificates && <Badge>Certificates</Badge>}
           </div>
           <p className="mt-2 text-sm text-slate-500">
-            {event.department} • {event.eventType} • {formatDate(event.date)}
+            {event.department} â€¢ {event.eventType} â€¢ {formatDate(event.date)}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -757,3 +709,4 @@ function ChartSkeleton({ rows }: { rows: number }) {
     </div>
   );
 }
+
