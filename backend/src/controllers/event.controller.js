@@ -9,6 +9,16 @@ const { roles } = require('../config/auth.config');
 const certificateService = require('../services/certificateService');
 const imageService = require('../services/imageService');
 
+const normalizeBoolean = (value, fallback) => {
+  if (value === undefined) return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+  }
+  return Boolean(value);
+};
+
 const promoteWaitlistedTickets = async (eventId) => {
   const event = await Event.findById(eventId);
   if (!event || event.registeredCount >= event.seatLimit) {
@@ -80,12 +90,12 @@ const createEvent = async (req, res, next) => {
       organizerId: req.user._id,
       eventType,
       department,
-      seatLimit,
+      seatLimit: Number(seatLimit),
       date,
       time,
       venue,
-      enableCertificates: enableCertificates === 'true' || enableCertificates === true,
-      waitlistEnabled: waitlistEnabled === undefined ? true : waitlistEnabled === 'true' || waitlistEnabled === true,
+      enableCertificates: normalizeBoolean(enableCertificates, false),
+      waitlistEnabled: normalizeBoolean(waitlistEnabled, true),
     });
 
     // Handle banner image if uploaded
@@ -280,8 +290,23 @@ const updateEvent = async (req, res, next) => {
       'seatLimit', 'date', 'time', 'venue', 'status', 'enableCertificates', 'waitlistEnabled'
     ];
 
-    allowedUpdates.forEach(field => {
+    allowedUpdates.forEach((field) => {
       if (req.body[field] !== undefined) {
+        if (field === 'seatLimit') {
+          event[field] = Number(req.body[field]);
+          return;
+        }
+
+        if (field === 'enableCertificates') {
+          event[field] = normalizeBoolean(req.body[field], event.enableCertificates);
+          return;
+        }
+
+        if (field === 'waitlistEnabled') {
+          event[field] = normalizeBoolean(req.body[field], event.waitlistEnabled);
+          return;
+        }
+
         event[field] = req.body[field];
       }
     });

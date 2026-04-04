@@ -4,6 +4,7 @@ function createRateLimiter({ windowMs, max, message }) {
   return rateLimit({
     windowMs,
     max,
+    skip: () => process.env.NODE_ENV === 'test',
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => {

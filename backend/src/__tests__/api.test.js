@@ -36,6 +36,15 @@ const signupUser = async (payload) => {
   };
 };
 
+const loginUser = async ({ email, password }) => {
+  const res = await request(app).post('/api/auth/login').send({ email, password });
+  return {
+    response: res,
+    token: res.body?.data?.token,
+    user: res.body?.data?.user,
+  };
+};
+
 const authHeader = (token) => ({ Authorization: `Bearer ${token}` });
 
 beforeAll(async () => {
@@ -131,6 +140,50 @@ describe('UniEvent API integration', () => {
 
     expect(listRes.status).toBe(200);
     expect(listRes.body.data.events).toHaveLength(1);
+  });
+
+  test('organizer can edit an event including waitlist and certificate flags', async () => {
+    const organizer = await signupUser(createUserPayload({
+      name: 'Organizer Edit',
+      email: 'organizer-edit@example.com',
+      department: 'Computer Science',
+      role: 'organizer',
+      rollNumber: undefined,
+    }));
+
+    const createRes = await request(app)
+      .post('/api/events')
+      .set(authHeader(organizer.token))
+      .send({
+        title: 'Edit Flow Workshop',
+        description: 'Initial event details for validating organizer-side updates.',
+        eventType: 'public',
+        department: 'Computer Science',
+        seatLimit: 25,
+        date: '2099-01-15',
+        time: '10:30',
+        venue: 'Seminar Hall',
+        enableCertificates: false,
+        waitlistEnabled: true,
+      });
+
+    expect(createRes.status).toBe(201);
+
+    const updateRes = await request(app)
+      .put(`/api/events/${createRes.body.data.event._id}`)
+      .set(authHeader(organizer.token))
+      .send({
+        title: 'Edit Flow Workshop Updated',
+        seatLimit: 40,
+        enableCertificates: true,
+        waitlistEnabled: false,
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.data.event.title).toBe('Edit Flow Workshop Updated');
+    expect(updateRes.body.data.event.seatLimit).toBe(40);
+    expect(updateRes.body.data.event.enableCertificates).toBe(true);
+    expect(updateRes.body.data.event.waitlistEnabled).toBe(false);
   });
 
   test('student can register once for a published event and duplicate registration is blocked', async () => {
@@ -252,23 +305,39 @@ describe('UniEvent API integration', () => {
   });
 
   test('full events can use waitlist and cancelled seats promote the oldest waitlisted ticket', async () => {
-    const organizer = await signupUser(createUserPayload({
+    const organizerPayload = createUserPayload({
       name: 'Organizer Four',
-      email: 'organizer4@example.com',
+      email: `organizer4-${Date.now()}@example.com`,
       department: 'Computer Science',
       role: 'organizer',
       rollNumber: undefined,
-    }));
-    const studentOne = await signupUser(createUserPayload({
+    });
+    const studentOnePayload = createUserPayload({
       name: 'Student Three',
-      email: 'student3@example.com',
+      email: `student3-${Date.now()}@example.com`,
       department: 'Computer Science',
-    }));
-    const studentTwo = await signupUser(createUserPayload({
+    });
+    const studentTwoPayload = createUserPayload({
       name: 'Student Four',
-      email: 'student4@example.com',
+      email: `student4-${Date.now()}@example.com`,
       department: 'Computer Science',
-    }));
+    });
+
+    const organizerSignup = await signupUser(organizerPayload);
+    const studentOneSignup = await signupUser(studentOnePayload);
+    const studentTwoSignup = await signupUser(studentTwoPayload);
+
+    expect(organizerSignup.response.status).toBe(201);
+    expect(studentOneSignup.response.status).toBe(201);
+    expect(studentTwoSignup.response.status).toBe(201);
+
+    const organizer = await loginUser(organizerPayload);
+    const studentOne = await loginUser(studentOnePayload);
+    const studentTwo = await loginUser(studentTwoPayload);
+
+    expect(organizer.response.status).toBe(200);
+    expect(studentOne.response.status).toBe(200);
+    expect(studentTwo.response.status).toBe(200);
 
     const event = await Event.create({
       title: 'Limited Lab Session',

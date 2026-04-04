@@ -49,7 +49,11 @@ const createEventValidation = [
   body('enableCertificates')
     .optional()
     .isBoolean()
-    .withMessage('enableCertificates must be boolean')
+    .withMessage('enableCertificates must be boolean'),
+  body('waitlistEnabled')
+    .optional()
+    .isBoolean()
+    .withMessage('waitlistEnabled must be boolean')
 ];
 
 const updateEventValidation = [
@@ -99,7 +103,11 @@ const updateEventValidation = [
   body('enableCertificates')
     .optional()
     .isBoolean()
-    .withMessage('enableCertificates must be boolean')
+    .withMessage('enableCertificates must be boolean'),
+  body('waitlistEnabled')
+    .optional()
+    .isBoolean()
+    .withMessage('waitlistEnabled must be boolean')
 ];
 
 // Public routes
