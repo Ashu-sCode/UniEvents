@@ -59,6 +59,7 @@ export function Modal({
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
+      role="presentation"
       className={cn(
         'fixed inset-0 z-50 flex items-end sm:items-center justify-center',
         'bg-black/50 backdrop-blur-sm',
@@ -66,6 +67,9 @@ export function Modal({
       )}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || 'Dialog'}
         className={cn(
           'relative w-full bg-white',
           'rounded-t-2xl sm:rounded-2xl',

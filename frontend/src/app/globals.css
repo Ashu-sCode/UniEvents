@@ -27,6 +27,33 @@
     -webkit-tap-highlight-color: transparent;
     @apply antialiased;
   }
+
+  ::selection {
+    background-color: #cbd5e1;
+    color: #0f172a;
+  }
+
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  [role='button'],
+  [tabindex]:not([tabindex='-1']) {
+    outline: none;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role='button']:focus-visible,
+  [tabindex]:not([tabindex='-1']):focus-visible {
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.2);
+    outline: 2px solid #0f172a;
+    outline-offset: 2px;
+  }
 }
 
 /* Component Styles - Minimal & Clean */
@@ -63,7 +90,7 @@
 
   .label {
     @apply block text-sm font-medium mb-2;
-    color: var(--text-secondary);
+    color: #4b5563;
   }
 
   /* Cards */
@@ -86,6 +113,17 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .not-sr-only {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: normal !important;
   }
 
   /* Animation utilities for modals and transitions */

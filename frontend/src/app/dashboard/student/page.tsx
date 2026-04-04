@@ -409,18 +409,27 @@ export default function StudentDashboard() {
     setDateTo('');
   };
 
+  const activeStudentTickets = ticketsAll.filter((ticket) => ticket.status === 'unused' || ticket.status === 'waitlisted').length;
+  const attendedEventsCount = ticketsAll.filter((ticket) => ticket.status === 'used').length;
+  const waitlistedTicketsCount = ticketsAll.filter((ticket) => ticket.status === 'waitlisted').length;
+
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dbeafe_0%,transparent_28%),radial-gradient(circle_at_top_right,#e0f2fe_0%,transparent_26%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_45%,#f8fafc_100%)]">
       {/* Header */}
-      <header className="bg-white border-b border-neutral-100 sticky top-0 z-50">
+      <header className="sticky top-0 z-50 border-b border-white/70 bg-white/85 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2.5">
-              <Ticket className="h-7 w-7 text-neutral-700" />
-              <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
+              <div className="rounded-2xl bg-neutral-900 p-2 text-white shadow-sm">
+                <Ticket className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-neutral-500">Student Dashboard</p>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-neutral-600">
+              <span className="hidden rounded-full border border-neutral-200 bg-white px-3 py-1 text-sm text-neutral-600 sm:inline-flex">
                 <strong className="text-neutral-900">{user?.name}</strong>
               </span>
               <NotificationBell />
@@ -444,9 +453,35 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Stat Cards - Clickable */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_55%,#334155_100%)] px-6 py-8 text-white shadow-[0_20px_70px_rgba(15,23,42,0.14)] sm:px-8">
+          <div className="grid gap-8 lg:grid-cols-[1.15fr,0.85fr] lg:items-end">
+            <div>
+              <span className="inline-flex rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-medium text-sky-100">
+                Student activity at a glance
+              </span>
+              <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+                Welcome back, {user?.name?.split(' ')[0] || 'Student'}.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
+                Browse upcoming events, monitor ticket status, follow waitlist movement, and keep certificates ready from one place.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3 text-sm text-slate-200">
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">{user?.department || 'Your stream'}</span>
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">{activeStudentTickets} active entries</span>
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">{attendedEventsCount} attended events</span>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <QuickHighlight value={activeStudentTickets} label="Active Tickets" helper="Confirmed or waiting for promotion" />
+              <QuickHighlight value={waitlistedTicketsCount} label="Waitlisted" helper="Seats pending availability" />
+              <QuickHighlight value={certificates.length} label="Certificates" helper="Issued and ready to download" />
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <StatCard
             icon={<Calendar className="h-6 w-6" />}
             label="Upcoming Events"
@@ -470,38 +505,39 @@ export default function StudentDashboard() {
           />
         </div>
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-3 mb-8">
+        <div className="mb-8 rounded-[1.75rem] border border-neutral-200 bg-white/90 p-3 shadow-sm backdrop-blur">
+          <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setActiveTab('events')}
-            className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
+            className={`px-5 py-2.5 rounded-2xl font-medium transition-all ${
               activeTab === 'events'
                 ? 'bg-neutral-900 text-white shadow-sm'
-                : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+                : 'bg-transparent text-neutral-600 hover:bg-neutral-100'
             }`}
           >
             Browse Events
           </button>
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
+            className={`px-5 py-2.5 rounded-2xl font-medium transition-all ${
               activeTab === 'tickets'
                 ? 'bg-neutral-900 text-white shadow-sm'
-                : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+                : 'bg-transparent text-neutral-600 hover:bg-neutral-100'
             }`}
           >
             My Tickets
           </button>
           <button
             onClick={() => setActiveTab('certificates')}
-            className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
+            className={`px-5 py-2.5 rounded-2xl font-medium transition-all ${
               activeTab === 'certificates'
                 ? 'bg-neutral-900 text-white shadow-sm'
-                : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+                : 'bg-transparent text-neutral-600 hover:bg-neutral-100'
             }`}
           >
             Certificates
           </button>
+        </div>
         </div>
 
         {/* Content */}
@@ -854,25 +890,35 @@ function StatCard({ icon, label, value, onClick, isActive }: any) {
   return (
     <button
       onClick={onClick}
-      className={`w-full bg-white rounded-2xl border p-5 flex items-center gap-4 transition-all text-left group ${
+      className={`w-full border p-5 flex items-center gap-4 transition-all text-left group rounded-[1.75rem] shadow-sm ${
         isActive 
-          ? 'border-neutral-900 shadow-md' 
-          : 'border-neutral-100 hover:border-neutral-200 hover:shadow-md'
+          ? 'border-neutral-900 bg-neutral-900 text-white shadow-[0_18px_50px_rgba(15,23,42,0.14)]' 
+          : 'border-white/70 bg-white/90 hover:-translate-y-0.5 hover:border-neutral-200 hover:shadow-md'
       }`}
     >
       <div className={`p-3 rounded-xl transition-colors ${
-        isActive ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200'
+        isActive ? 'bg-white/10 text-white' : 'bg-neutral-100 text-neutral-700 group-hover:bg-sky-50 group-hover:text-sky-700'
       }`}>
         {icon}
       </div>
       <div className="flex-1">
-        <p className="text-3xl font-bold text-neutral-900">{value}</p>
-        <p className="text-sm text-neutral-500">{label}</p>
+        <p className={`text-3xl font-bold ${isActive ? 'text-white' : 'text-neutral-900'}`}>{value}</p>
+        <p className={`text-sm ${isActive ? 'text-slate-200' : 'text-neutral-500'}`}>{label}</p>
       </div>
       <ChevronRight className={`h-5 w-5 transition-all ${
-        isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'
+        isActive ? 'text-white' : 'text-neutral-300 group-hover:text-neutral-500'
       }`} />
     </button>
+  );
+}
+
+function QuickHighlight({ value, label, helper }: { value: number | string; label: string; helper: string }) {
+  return (
+    <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+      <p className="text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-sm font-medium text-slate-100">{label}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-300">{helper}</p>
+    </div>
   );
 }
 
@@ -881,7 +927,7 @@ function EventCard({ event, isRegistered, isRegistering, onRegister }: any) {
   const waitlistCount = event.waitlistCount ?? 0;
   
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all">
+    <div className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/95 shadow-sm transition-all hover:-translate-y-1 hover:shadow-[0_20px_55px_rgba(15,23,42,0.12)]">
       {/* Event Banner Image */}
       <div className="h-40 w-full overflow-hidden">
         {bannerUrl ? (
@@ -903,8 +949,11 @@ function EventCard({ event, isRegistered, isRegistering, onRegister }: any) {
       </div>
       
       <div className="p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">{event.eventType}</span>
+          <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-600">{event.department}</span>
+        </div>
         <h3 className="font-semibold text-lg text-neutral-900 mb-1 line-clamp-1">{event.title}</h3>
-        <p className="text-xs text-neutral-500 mb-3">{event.department}</p>
         
         <div className="space-y-2 text-sm text-neutral-600 mb-4">
           <div className="flex items-center gap-2">
@@ -967,7 +1016,7 @@ function TicketCard({ ticket, onView, onDownload }: any) {
   const bannerUrl = getImageUrl(event?.bannerUrl);
 
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all">
+    <div className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/95 shadow-sm transition-all hover:-translate-y-1 hover:shadow-[0_20px_55px_rgba(15,23,42,0.12)]">
       {/* Event Banner */}
       <div className="h-32 w-full overflow-hidden relative">
         {bannerUrl ? (
@@ -991,7 +1040,7 @@ function TicketCard({ ticket, onView, onDownload }: any) {
         )}
 
         {/* Status Badge */}
-        <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm ${getStatusColor(ticket.status)}`}>
+        <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-medium shadow-sm backdrop-blur-sm ${getStatusColor(ticket.status)}`}>
           {ticket.status.toUpperCase()}
         </span>
       </div>
@@ -1021,7 +1070,7 @@ function TicketCard({ ticket, onView, onDownload }: any) {
         )}
 
         {/* Ticket ID */}
-        <p className="text-xs font-mono text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-lg mb-4 text-center">
+        <p className="text-xs font-mono text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-xl mb-4 text-center">
           {ticket.ticketId}
         </p>
 
@@ -1057,10 +1106,10 @@ function CertificateCard({ certificate, onDownload, onPreview }: any) {
   const event = certificate.eventId;
 
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100 p-6 hover:shadow-lg hover:scale-[1.02] transition-all">
+    <div className="rounded-[1.75rem] border border-white/70 bg-white/95 p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-[0_20px_55px_rgba(15,23,42,0.12)]">
       {/* Certificate Icon Header */}
       <div className="flex items-center justify-center mb-4">
-        <div className="p-3 rounded-full bg-neutral-100 text-neutral-700">
+        <div className="p-3 rounded-full bg-emerald-50 text-emerald-700">
           <Award className="h-8 w-8" />
         </div>
       </div>

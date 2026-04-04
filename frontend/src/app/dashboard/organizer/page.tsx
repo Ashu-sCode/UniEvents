@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -136,23 +136,28 @@ export default function OrganizerDashboard() {
   };
 
   const hasActiveOrganizerFilters = statusFilter !== 'all' || sortBy !== 'newest';
+  const totalRegistrations = events.reduce((sum, event) => sum + event.registeredCount, 0);
+  const publishedCount = events.filter((event) => event.status === 'published').length;
+  const draftCount = events.filter((event) => event.status === 'draft').length;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dcfce7_0%,transparent_24%),radial-gradient(circle_at_top_right,#dbeafe_0%,transparent_24%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_45%,#f8fafc_100%)]">
       {/* Header */}
-      <header className="bg-white border-b border-neutral-100 sticky top-0 z-50">
+      <header className="sticky top-0 z-50 border-b border-white/70 bg-white/85 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2.5">
-              <Ticket className="h-7 w-7 text-neutral-700" />
-              <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
-              <span className="text-sm bg-neutral-100 text-neutral-700 px-2.5 py-1 rounded-lg font-medium">
-                Organizer
-              </span>
+              <div className="rounded-2xl bg-neutral-900 p-2 text-white shadow-sm">
+                <Ticket className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="text-xl font-semibold text-neutral-900">UniEvent</span>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-neutral-500">Organizer Dashboard</p>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-neutral-600">
-                <strong className="text-neutral-900">{user?.name}</strong> • {user?.department}
+                <strong className="text-neutral-900">{user?.name}</strong> · {user?.department}
               </span>
               <NotificationBell />
               <button
@@ -175,9 +180,46 @@ export default function OrganizerDashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,#0f172a_0%,#1f2937_45%,#14532d_100%)] px-6 py-8 text-white shadow-[0_20px_70px_rgba(15,23,42,0.14)] sm:px-8">
+          <div className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr] lg:items-end">
+            <div>
+              <span className="inline-flex rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-medium text-emerald-100">
+                Event operations command center
+              </span>
+              <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+                Run events with more clarity and less manual work.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
+                Publish campus events, manage seats and waitlists, verify entries, and keep registrations moving from one organizer workspace.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  onClick={() => router.push('/dashboard/organizer/analytics')}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white px-4 py-2.5 text-sm font-medium text-neutral-900 transition hover:bg-neutral-100"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  View Analytics
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/20"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Event
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <OrganizerHighlight value={publishedCount} label="Published" helper="Events currently open for registrations" />
+              <OrganizerHighlight value={totalRegistrations} label="Registrations" helper="Confirmed signups across your events" />
+              <OrganizerHighlight value={draftCount} label="Drafts" helper="Events still being prepared before publish" />
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
           <StatCard
             icon={<Calendar className="h-5 w-5" />}
             label="Total Events"
@@ -186,7 +228,7 @@ export default function OrganizerDashboard() {
           <StatCard
             icon={<Users className="h-5 w-5" />}
             label="Total Registrations"
-            value={events.reduce((sum, e) => sum + e.registeredCount, 0)}
+            value={totalRegistrations}
           />
           <StatCard
             icon={<Ticket className="h-5 w-5" />}
@@ -209,7 +251,7 @@ export default function OrganizerDashboard() {
               </h2>
               <p className="mt-2 text-sm text-neutral-600">
                 Attendance coverage <strong className="text-neutral-900">{summary.overallAttendanceRate}</strong>
-                {' '}â€¢ Certificate coverage <strong className="text-neutral-900">{summary.certificateCoverageRate}</strong>
+                {' '}· Certificate coverage <strong className="text-neutral-900">{summary.certificateCoverageRate}</strong>
               </p>
             </div>
 
@@ -247,7 +289,7 @@ export default function OrganizerDashboard() {
                   <div>
                     <p className="font-medium text-neutral-900">{item.title}</p>
                     <p className="text-sm text-neutral-500">
-                      {item.department} â€¢ {item.eventType} â€¢ {formatDate(item.date)}
+                      {item.department} · {item.eventType} · {formatDate(item.date)}
                     </p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -271,25 +313,14 @@ export default function OrganizerDashboard() {
             </p>
           </div>
           <div className="flex w-full sm:w-auto gap-3">
-            <button
-              onClick={() => router.push('/dashboard/organizer/analytics')}
-              className="w-full sm:w-auto px-4 py-2.5 bg-white text-neutral-900 border border-neutral-200 rounded-xl font-medium hover:bg-neutral-50 transition-all flex items-center justify-center gap-2"
-            >
-              <BarChart3 className="h-4 w-4" />
-              View Analytics
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="w-full sm:w-auto px-4 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Create Event
-            </button>
+            <span className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-600">
+              {filteredEvents.length} visible events
+            </span>
           </div>
         </div>
 
         {/* Filter & Sort Controls */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-4 rounded-[1.75rem] border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur">
           {/* Status Filter */}
           <div className="relative">
             <select
@@ -465,14 +496,24 @@ export default function OrganizerDashboard() {
 
 function StatCard({ icon, label, value }: any) {
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100 p-6 flex items-center gap-4">
-      <div className="p-3 rounded-xl bg-neutral-100 text-neutral-700">
+    <div className="flex items-center gap-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+      <div className="rounded-2xl bg-neutral-900 p-3 text-white">
         {icon}
       </div>
       <div>
         <p className="text-2xl font-semibold text-neutral-900">{value}</p>
         <p className="text-sm text-neutral-600">{label}</p>
       </div>
+    </div>
+  );
+}
+
+function OrganizerHighlight({ value, label, helper }: { value: number | string; label: string; helper: string }) {
+  return (
+    <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+      <p className="text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-sm font-medium text-slate-100">{label}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-300">{helper}</p>
     </div>
   );
 }
@@ -502,7 +543,7 @@ function SummaryCard({
         <>
           <h3 className="mt-2 text-lg font-semibold text-neutral-900">{summary.title}</h3>
           <p className="mt-1 text-sm text-neutral-500">
-            {summary.department} â€¢ {summary.eventType} â€¢ {formatDate(summary.date)}
+            {summary.department} · {summary.eventType} · {formatDate(summary.date)}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <MetricPill label="Attendance" value={summary.attendanceRate} />
@@ -559,7 +600,7 @@ function EventCard({ event, onScan, onEdit, onDelete, onView, isDeleting, onSetS
         if (newStatus === 'published') return 'Event published';
         if (newStatus === 'completed') {
           if (certResult?.generated > 0) {
-            return `Event completed — ${certResult.generated} certificates generated`;
+            return `Event completed - ${certResult.generated} certificates generated`;
           }
           return 'Event marked as completed';
         }
@@ -581,8 +622,8 @@ function EventCard({ event, onScan, onEdit, onDelete, onView, isDeleting, onSetS
 
   const bannerUrl = getImageUrl(event.bannerUrl);
 
-  return (
-    <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden max-w-sm w-full hover:shadow-lg hover:scale-[1.02] transition-all">
+    return (
+      <div className="max-w-sm w-full overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/95 shadow-sm transition-all hover:-translate-y-1 hover:shadow-[0_20px_55px_rgba(15,23,42,0.12)]">
       {/* Event Banner */}
       <div className="h-36 w-full overflow-hidden relative">
         {bannerUrl ? (
@@ -607,15 +648,19 @@ function EventCard({ event, onScan, onEdit, onDelete, onView, isDeleting, onSetS
         </span>
       </div>
       
-      <div className="p-4">
-        {/* Title */}
-        <h3 className="font-semibold text-neutral-900 line-clamp-1 mb-2">{event.title}</h3>
+        <div className="p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">{event.status}</span>
+            <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-600">{event.department}</span>
+          </div>
+          {/* Title */}
+          <h3 className="font-semibold text-neutral-900 line-clamp-1 mb-2">{event.title}</h3>
 
         {/* Meta info */}
         <div className="space-y-1 text-sm text-neutral-600 mb-3">
           <p className="flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-neutral-400" />
-            {formatDate(event.date)} • {event.time}
+            {formatDate(event.date)} · {event.time}
           </p>
           <p className="flex items-center gap-2">
             <MapPin className="h-3.5 w-3.5 text-neutral-400" />
@@ -1154,7 +1199,7 @@ function QRScanModal({ event, onClose }: any) {
                         {result.data.verification.attendee.name}
                       </p>
                       <p className="text-sm text-neutral-500">
-                        {result.data.verification.attendee.rollNumber} • {result.data.verification.attendee.department}
+                        {result.data.verification.attendee.rollNumber} · {result.data.verification.attendee.department}
                       </p>
                     </div>
                   </div>
@@ -1181,3 +1226,5 @@ function QRScanModal({ event, onClose }: any) {
     </div>
   );
 }
+
+

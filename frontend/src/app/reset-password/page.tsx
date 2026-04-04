@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Ticket, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react';
 
 import { useApi } from '@/hooks/useApi';
 import { authAPI } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
-import { Button, Card } from '@/components/ui';
+import { Button } from '@/components/ui';
+import { AuthShell } from '@/components/AuthShell';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -23,8 +24,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const t = params.get('token');
-    setToken(t);
+    setToken(params.get('token'));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,79 +60,89 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-10">
-          <Link href="/" className="inline-flex items-center space-x-2.5 group">
-            <Ticket className="h-9 w-9 text-neutral-700 group-hover:text-neutral-900 transition-colors" />
-            <span className="text-2xl font-semibold text-neutral-900">UniEvent</span>
+    <AuthShell
+      eyebrow="Set New Password"
+      title="Choose a fresh password and return to your account securely."
+      description="Use the reset link from your email to set a new password for your UniEvent account."
+      sideTitle="Secure access for your event workflow."
+      sideDescription="A successful reset gets you back to your account without losing your registrations, event operations, notifications, or reporting context."
+      highlights={[
+        'Students keep access to tickets, attendance, and certificates.',
+        'Organizers keep access to events, waitlists, and dashboard tools.',
+        'Password validation helps reduce accidental mistakes during recovery.',
+      ]}
+      footer={(
+        <p>
+          Back to{' '}
+          <Link href="/login" className="font-medium text-neutral-950 hover:text-neutral-700">
+            Sign in
           </Link>
-          <p className="mt-3 text-neutral-600">Set a new password</p>
+        </p>
+      )}
+    >
+      {!token ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+          Reset token is missing or invalid.{' '}
+          <Link href="/forgot-password" className="font-medium text-amber-900 underline decoration-amber-300 underline-offset-4">
+            Request a new reset link
+          </Link>
+          .
         </div>
-
-        <Card>
-          {!token ? (
-            <div className="text-sm text-neutral-700">
-              <p>Reset token is missing or invalid.</p>
-              <p className="mt-3">
-                <Link href="/forgot-password" className="text-neutral-900 hover:text-neutral-700 font-medium">
-                  Request a new reset link
-                </Link>
-              </p>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label htmlFor="password" className="label">New Password</label>
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input pl-10 pr-12"
+                placeholder="Enter a new password"
+                minLength={6}
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-neutral-500 transition-colors hover:text-neutral-700"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
+              </button>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label htmlFor="password" className="label">New Password</label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="input pr-10"
-                    placeholder="••••••••"
-                    minLength={6}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="confirm" className="label">Confirm Password</label>
-                <input
-                  id="confirm"
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="input"
-                  placeholder="••••••••"
-                  minLength={6}
-                  required
-                />
-              </div>
-
-              <Button type="submit" isLoading={isLoading} className="w-full mt-6">
-                {isLoading ? 'Resetting...' : 'Reset password'}
-              </Button>
-            </form>
-          )}
-
-          <div className="mt-6 text-center text-sm text-neutral-600">
-            Back to{' '}
-            <Link href="/login" className="text-neutral-900 hover:text-neutral-700 font-medium transition-colors">
-              Sign in
-            </Link>
           </div>
-        </Card>
-      </div>
-    </div>
+
+          <div>
+            <label htmlFor="confirm" className="label">Confirm Password</label>
+            <input
+              id="confirm"
+              type={showPassword ? 'text' : 'password'}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className="input"
+              placeholder="Re-enter the new password"
+              minLength={6}
+              autoComplete="new-password"
+              required
+            />
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
+              <p>Choose a password with at least 6 characters so you can get back into your account smoothly.</p>
+            </div>
+          </div>
+
+          <Button type="submit" isLoading={isLoading} className="w-full py-3 text-base">
+            {isLoading ? 'Resetting...' : 'Reset Password'}
+          </Button>
+        </form>
+      )}
+    </AuthShell>
   );
 }
