@@ -7,6 +7,7 @@
  */
 
 const mongoose = require('mongoose');
+const logger = require('../utils/logger');
 
 const getBucket = (bucketName) => {
   if (!bucketName) {
@@ -37,6 +38,7 @@ const saveBuffer = async ({ bucket, filename, contentType, buffer, metadata = {}
   }
 
   const gridfs = getBucket(bucket);
+  const startedAt = Date.now();
 
   return new Promise((resolve, reject) => {
     const uploadStream = gridfs.openUploadStream(filename, {
@@ -44,9 +46,29 @@ const saveBuffer = async ({ bucket, filename, contentType, buffer, metadata = {}
       metadata
     });
 
-    uploadStream.on('error', reject);
+    uploadStream.on('error', (error) => {
+      logger.error('gridfs.upload.failed', {
+        bucket,
+        filename,
+        contentType,
+        sizeBytes: buffer.length,
+        metadata,
+        durationMs: Date.now() - startedAt,
+        error,
+      });
+      reject(error);
+    });
 
     uploadStream.on('finish', () => {
+      logger.info('gridfs.upload.completed', {
+        bucket,
+        filename,
+        contentType,
+        fileId: uploadStream.id?.toString?.() || uploadStream.id,
+        sizeBytes: buffer.length,
+        metadata,
+        durationMs: Date.now() - startedAt,
+      });
       resolve({ fileId: uploadStream.id });
     });
 
@@ -66,8 +88,24 @@ const deleteFile = async ({ bucket, fileId }) => {
 
   const gridfs = getBucket(bucket);
   const objectId = typeof fileId === 'string' ? new mongoose.Types.ObjectId(fileId) : fileId;
+  const startedAt = Date.now();
 
-  return gridfs.delete(objectId);
+  try {
+    await gridfs.delete(objectId);
+    logger.info('gridfs.delete.completed', {
+      bucket,
+      fileId: objectId.toString(),
+      durationMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    logger.error('gridfs.delete.failed', {
+      bucket,
+      fileId: objectId.toString(),
+      durationMs: Date.now() - startedAt,
+      error,
+    });
+    throw error;
+  }
 };
 
 /**
@@ -81,6 +119,10 @@ const deleteFile = async ({ bucket, fileId }) => {
 const openDownloadStream = ({ bucket, fileId }) => {
   const gridfs = getBucket(bucket);
   const objectId = typeof fileId === 'string' ? new mongoose.Types.ObjectId(fileId) : fileId;
+  logger.info('gridfs.download.opened', {
+    bucket,
+    fileId: objectId.toString(),
+  });
 
   return gridfs.openDownloadStream(objectId);
 };

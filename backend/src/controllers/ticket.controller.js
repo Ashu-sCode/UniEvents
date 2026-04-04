@@ -8,6 +8,34 @@ const Ticket = require('../models/Ticket.model');
 const Attendance = require('../models/Attendance.model');
 const { generateQRCode } = require('../utils/qrGenerator');
 const { generateTicketPDF } = require('../utils/pdfGenerator');
+const logger = require('../utils/logger');
+
+const promoteNextWaitlistedTicket = async (eventId) => {
+  const nextWaitlisted = await Ticket.findOne({
+    eventId,
+    status: Ticket.TICKET_STATUS.WAITLISTED,
+  }).sort({ waitlistedAt: 1, createdAt: 1 });
+
+  if (!nextWaitlisted) {
+    return null;
+  }
+
+  nextWaitlisted.status = Ticket.TICKET_STATUS.UNUSED;
+  nextWaitlisted.promotedAt = new Date();
+  await nextWaitlisted.save();
+
+  await Event.findByIdAndUpdate(eventId, {
+    $inc: {
+      registeredCount: 1,
+      waitlistCount: -1,
+    },
+  });
+
+  await nextWaitlisted.populate('eventId', 'title date time venue bannerUrl department eventType');
+  await nextWaitlisted.populate('userId', 'name rollNumber department email');
+
+  return nextWaitlisted;
+};
 
 /**
  * @route   POST /api/tickets/register/:eventId
@@ -32,14 +60,6 @@ const registerForEvent = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Registration is not open for this event'
-      });
-    }
-
-    // Check if seats are available
-    if (event.registeredCount >= event.seatLimit) {
-      return res.status(400).json({
-        success: false,
-        message: 'No seats available'
       });
     }
 
@@ -74,10 +94,21 @@ const registerForEvent = async (req, res, next) => {
     }
 
     // Create ticket with unique ID
+    const isWaitlistRegistration = event.registeredCount >= event.seatLimit;
+
+    if (isWaitlistRegistration && !event.waitlistEnabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'No seats available and waitlist is closed'
+      });
+    }
+
     const ticketData = {
       eventId,
       userId: req.user._id,
-      qrCode: '' // Will be set after ticket creation
+      qrCode: '', // Will be set after ticket creation
+      status: isWaitlistRegistration ? Ticket.TICKET_STATUS.WAITLISTED : Ticket.TICKET_STATUS.UNUSED,
+      waitlistedAt: isWaitlistRegistration ? new Date() : null,
     };
 
     const ticket = new Ticket(ticketData);
@@ -88,19 +119,31 @@ const registerForEvent = async (req, res, next) => {
 
     await ticket.save();
 
-    // Increment registered count
+    // Increment confirmed registrations or waitlist count
     await Event.findByIdAndUpdate(eventId, {
-      $inc: { registeredCount: 1 }
+      $inc: isWaitlistRegistration ? { waitlistCount: 1 } : { registeredCount: 1 }
     });
 
     // Populate for response
     await ticket.populate('eventId', 'title date time venue bannerUrl department eventType');
     await ticket.populate('userId', 'name rollNumber department');
 
+    const waitlistPosition = isWaitlistRegistration
+      ? await Ticket.countDocuments({
+          eventId,
+          status: Ticket.TICKET_STATUS.WAITLISTED,
+          waitlistedAt: { $lte: ticket.waitlistedAt },
+        })
+      : null;
+
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
-      data: { ticket }
+      message: isWaitlistRegistration ? 'Added to waitlist successfully' : 'Registration successful',
+      data: {
+        ticket,
+        registrationType: isWaitlistRegistration ? 'waitlist' : 'confirmed',
+        waitlistPosition,
+      }
     });
   } catch (error) {
     next(error);
@@ -114,13 +157,20 @@ const registerForEvent = async (req, res, next) => {
  */
 const getMyTickets = async (req, res, next) => {
   try {
-    const { page, limit } = req.query;
+    const { page, limit, status, search } = req.query;
 
     const hasPagination = page !== undefined || limit !== undefined;
     const parsedPage = Math.max(1, parseInt(page || '1', 10));
     const parsedLimit = Math.min(100, Math.max(1, parseInt(limit || '10', 10)));
 
     const baseQuery = { userId: req.user._id };
+    if (status) {
+      baseQuery.status = status;
+    }
+    if (search) {
+      const escaped = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      baseQuery.ticketId = new RegExp(escaped, 'i');
+    }
 
     const total = await Ticket.countDocuments(baseQuery);
 
@@ -199,10 +249,20 @@ const getTicketById = async (req, res, next) => {
  * 5. Records attendance
  */
 const verifyTicket = async (req, res, next) => {
+  const startedAt = Date.now();
   try {
     const { ticketId, eventId } = req.body;
+    const scanContext = {
+      ticketId,
+      eventId,
+      organizerId: req.user?._id?.toString?.(),
+    };
 
     if (!ticketId || !eventId) {
+      logger.warn('ticket.verification.invalid_request', {
+        ...scanContext,
+        durationMs: Date.now() - startedAt,
+      });
       return res.status(400).json({
         success: false,
         message: 'Ticket ID and Event ID are required'
@@ -215,6 +275,10 @@ const verifyTicket = async (req, res, next) => {
       .populate('eventId', 'title organizerId');
 
     if (!ticket) {
+      logger.warn('ticket.verification.failed.not_found', {
+        ...scanContext,
+        durationMs: Date.now() - startedAt,
+      });
       return res.status(404).json({
         success: false,
         message: 'Invalid ticket',
@@ -224,6 +288,11 @@ const verifyTicket = async (req, res, next) => {
 
     // Verify ticket belongs to correct event
     if (ticket.eventId._id.toString() !== eventId) {
+      logger.warn('ticket.verification.failed.wrong_event', {
+        ...scanContext,
+        actualEventId: ticket.eventId._id.toString(),
+        durationMs: Date.now() - startedAt,
+      });
       return res.status(400).json({
         success: false,
         message: 'Ticket is not for this event',
@@ -233,6 +302,11 @@ const verifyTicket = async (req, res, next) => {
 
     // Verify organizer owns this event
     if (ticket.eventId.organizerId.toString() !== req.user._id.toString()) {
+      logger.warn('ticket.verification.failed.unauthorized_organizer', {
+        ...scanContext,
+        ticketOwnerOrganizerId: ticket.eventId.organizerId.toString(),
+        durationMs: Date.now() - startedAt,
+      });
       return res.status(403).json({
         success: false,
         message: 'Not authorized to verify tickets for this event'
@@ -241,6 +315,12 @@ const verifyTicket = async (req, res, next) => {
 
     // Check if ticket is already used
     if (ticket.status === Ticket.TICKET_STATUS.USED) {
+      logger.info('ticket.verification.rejected.already_used', {
+        ...scanContext,
+        attendeeId: ticket.userId._id.toString(),
+        usedAt: ticket.usedAt,
+        durationMs: Date.now() - startedAt,
+      });
       return res.status(400).json({
         success: false,
         message: 'Ticket already used',
@@ -254,10 +334,28 @@ const verifyTicket = async (req, res, next) => {
 
     // Check if ticket is cancelled
     if (ticket.status === Ticket.TICKET_STATUS.CANCELLED) {
+      logger.info('ticket.verification.rejected.cancelled', {
+        ...scanContext,
+        attendeeId: ticket.userId._id.toString(),
+        durationMs: Date.now() - startedAt,
+      });
       return res.status(400).json({
         success: false,
         message: 'Ticket is cancelled',
         verification: { valid: false, reason: 'CANCELLED' }
+      });
+    }
+
+    if (ticket.status === Ticket.TICKET_STATUS.WAITLISTED) {
+      logger.info('ticket.verification.rejected.waitlisted', {
+        ...scanContext,
+        attendeeId: ticket.userId._id.toString(),
+        durationMs: Date.now() - startedAt,
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Ticket is still on the waitlist',
+        verification: { valid: false, reason: 'WAITLISTED' }
       });
     }
 
@@ -270,6 +368,13 @@ const verifyTicket = async (req, res, next) => {
       userId: ticket.userId._id,
       ticketId: ticket._id,
       verifiedBy: req.user._id
+    });
+
+    logger.info('ticket.verification.succeeded', {
+      ...scanContext,
+      attendeeId: ticket.userId._id.toString(),
+      attendeeName: ticket.userId.name,
+      durationMs: Date.now() - startedAt,
     });
 
     res.json({
@@ -286,6 +391,13 @@ const verifyTicket = async (req, res, next) => {
       }
     });
   } catch (error) {
+    logger.error('ticket.verification.failed.unexpected', {
+      ticketId: req.body?.ticketId,
+      eventId: req.body?.eventId,
+      organizerId: req.user?._id?.toString?.(),
+      durationMs: Date.now() - startedAt,
+      error,
+    });
     next(error);
   }
 };
@@ -420,21 +532,31 @@ const cancelTicket = async (req, res, next) => {
       });
     }
 
+    const previousStatus = ticket.status;
+    const wasConfirmedSeat = previousStatus === Ticket.TICKET_STATUS.UNUSED;
+
     // Cancel the ticket
     ticket.status = Ticket.TICKET_STATUS.CANCELLED;
     await ticket.save();
 
-    // Decrement registered count (best-effort)
+    let promotedTicket = null;
+
+    // Update seat / waitlist counters and backfill next waitlisted attendee
     try {
-      await Event.findByIdAndUpdate(ticket.eventId._id, { $inc: { registeredCount: -1 } });
+      if (wasConfirmedSeat) {
+        await Event.findByIdAndUpdate(ticket.eventId._id, { $inc: { registeredCount: -1 } });
+        promotedTicket = await promoteNextWaitlistedTicket(ticket.eventId._id);
+      } else if (previousStatus === Ticket.TICKET_STATUS.WAITLISTED) {
+        await Event.findByIdAndUpdate(ticket.eventId._id, { $inc: { waitlistCount: -1 } });
+      }
     } catch (e) {
       console.error('Error decrementing event registeredCount:', e);
     }
 
     res.json({
       success: true,
-      message: 'Ticket cancelled',
-      data: { ticket }
+      message: promotedTicket ? 'Ticket cancelled and next waitlisted student promoted' : 'Ticket cancelled',
+      data: { ticket, promotedTicket }
     });
   } catch (error) {
     next(error);

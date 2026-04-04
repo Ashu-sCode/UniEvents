@@ -12,6 +12,7 @@ const { authenticate, organizerOnly } = require('../middleware/auth.middleware')
 router.get('/my-attendance', authenticate, attendanceController.getMyAttendance);
 
 // Organizer routes
+router.get('/organizer/summary', authenticate, organizerOnly, attendanceController.getOrganizerSummary);
 router.get('/event/:eventId', authenticate, organizerOnly, attendanceController.getEventAttendance);
 router.get('/event/:eventId/stats', authenticate, organizerOnly, attendanceController.getEventStats);
 

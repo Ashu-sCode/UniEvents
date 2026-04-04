@@ -250,4 +250,75 @@ describe('UniEvent API integration', () => {
     expect(secondVerifyRes.status).toBe(400);
     expect(secondVerifyRes.body.verification.reason).toBe('ALREADY_USED');
   });
+
+  test('full events can use waitlist and cancelled seats promote the oldest waitlisted ticket', async () => {
+    const organizer = await signupUser(createUserPayload({
+      name: 'Organizer Four',
+      email: 'organizer4@example.com',
+      department: 'Computer Science',
+      role: 'organizer',
+      rollNumber: undefined,
+    }));
+    const studentOne = await signupUser(createUserPayload({
+      name: 'Student Three',
+      email: 'student3@example.com',
+      department: 'Computer Science',
+    }));
+    const studentTwo = await signupUser(createUserPayload({
+      name: 'Student Four',
+      email: 'student4@example.com',
+      department: 'Computer Science',
+    }));
+
+    const event = await Event.create({
+      title: 'Limited Lab Session',
+      description: 'Hands-on lab with only one available machine slot.',
+      organizerId: organizer.user.id,
+      eventType: 'public',
+      department: 'Computer Science',
+      seatLimit: 1,
+      registeredCount: 0,
+      waitlistCount: 0,
+      waitlistEnabled: true,
+      date: new Date('2099-04-10'),
+      time: '11:00',
+      venue: 'Lab 2',
+      status: Event.EVENT_STATUS.PUBLISHED,
+      enableCertificates: false,
+    });
+
+    const firstRegistration = await request(app)
+      .post(`/api/tickets/register/${event._id}`)
+      .set(authHeader(studentOne.token));
+
+    expect(firstRegistration.status).toBe(201);
+    expect(firstRegistration.body.data.registrationType).toBe('confirmed');
+
+    const secondRegistration = await request(app)
+      .post(`/api/tickets/register/${event._id}`)
+      .set(authHeader(studentTwo.token));
+
+    expect(secondRegistration.status).toBe(201);
+    expect(secondRegistration.body.data.registrationType).toBe('waitlist');
+    expect(secondRegistration.body.data.ticket.status).toBe('waitlisted');
+    expect(secondRegistration.body.data.waitlistPosition).toBe(1);
+
+    const waitlistedBeforePromotion = await Ticket.findOne({ userId: studentTwo.user.id });
+    expect(waitlistedBeforePromotion.status).toBe('waitlisted');
+
+    const cancelRes = await request(app)
+      .patch(`/api/tickets/${firstRegistration.body.data.ticket.ticketId}/cancel`)
+      .set(authHeader(organizer.token));
+
+    expect(cancelRes.status).toBe(200);
+    expect(cancelRes.body.data.promotedTicket.ticketId).toBe(secondRegistration.body.data.ticket.ticketId);
+
+    const promotedTicket = await Ticket.findOne({ ticketId: secondRegistration.body.data.ticket.ticketId });
+    expect(promotedTicket.status).toBe('unused');
+    expect(promotedTicket.promotedAt).toBeTruthy();
+
+    const refreshedEvent = await Event.findById(event._id);
+    expect(refreshedEvent.registeredCount).toBe(1);
+    expect(refreshedEvent.waitlistCount).toBe(0);
+  });
 });

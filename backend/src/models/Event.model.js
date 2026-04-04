@@ -57,6 +57,11 @@ const eventSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  waitlistCount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   date: {
     type: Date,
     required: [true, 'Event date is required']
@@ -86,6 +91,10 @@ const eventSchema = new mongoose.Schema({
   enableCertificates: {
     type: Boolean,
     default: false  // Enable certificate generation for workshops
+  },
+  waitlistEnabled: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true
@@ -109,6 +118,13 @@ eventSchema.virtual('seatsAvailable').get(function() {
 eventSchema.virtual('isRegistrationOpen').get(function() {
   return this.status === EVENT_STATUS.PUBLISHED && 
          this.registeredCount < this.seatLimit &&
+         new Date(this.date) > new Date();
+});
+
+eventSchema.virtual('isWaitlistOpen').get(function() {
+  return this.status === EVENT_STATUS.PUBLISHED &&
+         this.waitlistEnabled &&
+         this.registeredCount >= this.seatLimit &&
          new Date(this.date) > new Date();
 });
 

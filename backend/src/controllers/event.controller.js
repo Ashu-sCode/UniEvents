@@ -9,6 +9,50 @@ const { roles } = require('../config/auth.config');
 const certificateService = require('../services/certificateService');
 const imageService = require('../services/imageService');
 
+const promoteWaitlistedTickets = async (eventId) => {
+  const event = await Event.findById(eventId);
+  if (!event || event.registeredCount >= event.seatLimit) {
+    return [];
+  }
+
+  const availableSeats = Math.max(0, event.seatLimit - event.registeredCount);
+  if (availableSeats === 0) {
+    return [];
+  }
+
+  const waitlistedTickets = await Ticket.find({
+    eventId,
+    status: Ticket.TICKET_STATUS.WAITLISTED,
+  })
+    .sort({ waitlistedAt: 1, createdAt: 1 })
+    .limit(availableSeats);
+
+  if (waitlistedTickets.length === 0) {
+    return [];
+  }
+
+  const promotedIds = waitlistedTickets.map((ticket) => ticket._id);
+
+  await Ticket.updateMany(
+    { _id: { $in: promotedIds } },
+    {
+      $set: {
+        status: Ticket.TICKET_STATUS.UNUSED,
+        promotedAt: new Date(),
+      },
+    }
+  );
+
+  await Event.findByIdAndUpdate(eventId, {
+    $inc: {
+      registeredCount: waitlistedTickets.length,
+      waitlistCount: -waitlistedTickets.length,
+    },
+  });
+
+  return waitlistedTickets.map((ticket) => ticket.ticketId);
+};
+
 /**
  * @route   POST /api/events
  * @desc    Create a new event
@@ -25,7 +69,8 @@ const createEvent = async (req, res, next) => {
       date,
       time,
       venue,
-      enableCertificates
+      enableCertificates,
+      waitlistEnabled,
     } = req.body;
 
     // Create event first
@@ -39,7 +84,8 @@ const createEvent = async (req, res, next) => {
       date,
       time,
       venue,
-      enableCertificates: enableCertificates === 'true' || enableCertificates === true
+      enableCertificates: enableCertificates === 'true' || enableCertificates === true,
+      waitlistEnabled: waitlistEnabled === undefined ? true : waitlistEnabled === 'true' || waitlistEnabled === true,
     });
 
     // Handle banner image if uploaded
@@ -226,11 +272,12 @@ const updateEvent = async (req, res, next) => {
     const previousStatus = event.status;
     const newStatus = req.body.status;
     const isCompletingEvent = previousStatus !== 'completed' && newStatus === 'completed';
+    const previousSeatLimit = event.seatLimit;
 
     // Update allowed fields
     const allowedUpdates = [
       'title', 'description', 'eventType', 'department',
-      'seatLimit', 'date', 'time', 'venue', 'status', 'enableCertificates'
+      'seatLimit', 'date', 'time', 'venue', 'status', 'enableCertificates', 'waitlistEnabled'
     ];
 
     allowedUpdates.forEach(field => {
@@ -238,6 +285,13 @@ const updateEvent = async (req, res, next) => {
         event[field] = req.body[field];
       }
     });
+
+    if (event.seatLimit < event.registeredCount) {
+      return res.status(400).json({
+        success: false,
+        message: `Seat limit cannot be lower than ${event.registeredCount} confirmed registrations`
+      });
+    }
 
     // Handle banner image upload if present
     if (req.file) {
@@ -269,6 +323,15 @@ const updateEvent = async (req, res, next) => {
 
     await event.save();
 
+    let promotedTicketIds = [];
+    if (
+      event.status === Event.EVENT_STATUS.PUBLISHED &&
+      (event.seatLimit > previousSeatLimit || previousStatus !== Event.EVENT_STATUS.PUBLISHED)
+    ) {
+      promotedTicketIds = await promoteWaitlistedTickets(event._id);
+      event = await Event.findById(event._id);
+    }
+
     // Auto-generate certificates if event is being marked as completed
     let certificateResult = null;
     if (isCompletingEvent && event.enableCertificates) {
@@ -290,7 +353,8 @@ const updateEvent = async (req, res, next) => {
       message: 'Event updated successfully',
       data: { 
         event,
-        certificates: certificateResult
+        certificates: certificateResult,
+        promotedTicketIds,
       }
     });
   } catch (error) {
@@ -368,7 +432,7 @@ const getEventRegistrations = async (req, res, next) => {
 
     const tickets = await Ticket.find({ eventId: req.params.id })
       .populate('userId', 'name email rollNumber department')
-      .sort({ createdAt: -1 });
+      .sort({ status: 1, createdAt: -1 });
 
     res.json({
       success: true,

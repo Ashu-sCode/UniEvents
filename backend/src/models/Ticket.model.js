@@ -13,7 +13,8 @@ const { v4: uuidv4 } = require('uuid');
 const TICKET_STATUS = {
   UNUSED: 'unused',
   USED: 'used',
-  CANCELLED: 'cancelled'
+  CANCELLED: 'cancelled',
+  WAITLISTED: 'waitlisted'
 };
 
 const ticketSchema = new mongoose.Schema({
@@ -42,6 +43,14 @@ const ticketSchema = new mongoose.Schema({
     default: TICKET_STATUS.UNUSED
   },
   usedAt: {
+    type: Date,
+    default: null
+  },
+  waitlistedAt: {
+    type: Date,
+    default: null
+  },
+  promotedAt: {
     type: Date,
     default: null
   }

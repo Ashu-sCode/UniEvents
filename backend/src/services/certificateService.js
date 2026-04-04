@@ -11,6 +11,7 @@ const Event = require('../models/Event.model');
 const Attendance = require('../models/Attendance.model');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const fileStorageService = require('./fileStorageService');
+const logger = require('../utils/logger');
 
 const certificateError = (message, statusCode = 500) => {
   const error = new Error(message);
@@ -27,6 +28,7 @@ const certificateError = (message, statusCode = 500) => {
  * @returns {Promise<Object>} Result with count of certificates generated
  */
 const generateCertificatesForEvent = async (eventId, issuerId) => {
+  const startedAt = Date.now();
   try {
     // Fetch event with validation
     const event = await Event.findById(eventId);
@@ -36,7 +38,11 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
 
     // Check if certificates are enabled for this event
     if (!event.enableCertificates) {
-      console.log(`[CertificateService] Certificates not enabled for event: ${event.title}`);
+      logger.info('certificate.generation.skipped.disabled', {
+        eventId: event._id.toString(),
+        eventTitle: event.title,
+        issuerId: issuerId?.toString?.() || issuerId,
+      });
       return {
         success: true,
         message: 'Certificates not enabled for this event',
@@ -55,7 +61,11 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
       .populate('userId', 'name email rollNumber department');
 
     if (attendees.length === 0) {
-      console.log(`[CertificateService] No attendees found for event: ${event.title}`);
+      logger.warn('certificate.generation.skipped.no_attendees', {
+        eventId: event._id.toString(),
+        eventTitle: event.title,
+        issuerId: issuerId?.toString?.() || issuerId,
+      });
       return {
         success: true,
         message: 'No attendees found',
@@ -83,7 +93,13 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
           skipped++;
         }
       } catch (err) {
-        console.error(`[CertificateService] Error generating certificate for user ${attendance.userId._id}:`, err);
+        logger.error('certificate.generation.single.failed', {
+          eventId: event._id.toString(),
+          eventTitle: event.title,
+          issuerId: issuerId?.toString?.() || issuerId,
+          userId: attendance.userId._id.toString(),
+          error: err,
+        });
         errors.push({
           userId: attendance.userId._id,
           error: err.message
@@ -91,7 +107,16 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
       }
     }
 
-    console.log(`[CertificateService] Event "${event.title}": Generated ${generated}, Skipped ${skipped}`);
+    logger.info('certificate.generation.completed', {
+      eventId: event._id.toString(),
+      eventTitle: event.title,
+      issuerId: issuerId?.toString?.() || issuerId,
+      generated,
+      skipped,
+      totalAttendees: attendees.length,
+      errorCount: errors.length,
+      durationMs: Date.now() - startedAt,
+    });
 
     return {
       success: true,
@@ -102,7 +127,12 @@ const generateCertificatesForEvent = async (eventId, issuerId) => {
       errors: errors.length > 0 ? errors : undefined
     };
   } catch (error) {
-    console.error('[CertificateService] Error in generateCertificatesForEvent:', error);
+    logger.error('certificate.generation.failed', {
+      eventId: eventId?.toString?.() || eventId,
+      issuerId: issuerId?.toString?.() || issuerId,
+      durationMs: Date.now() - startedAt,
+      error,
+    });
     throw error;
   }
 };
@@ -124,7 +154,11 @@ const generateSingleCertificate = async (event, user, issuerId) => {
   });
 
   if (existingCert) {
-    console.log(`[CertificateService] Certificate already exists for user: ${user.name}`);
+    logger.info('certificate.generation.single.skipped_existing', {
+      eventId: event._id.toString(),
+      userId: user._id.toString(),
+      certificateId: existingCert.certificateId,
+    });
     return {
       created: false,
       certificate: existingCert
@@ -170,7 +204,13 @@ const generateSingleCertificate = async (event, user, issuerId) => {
   certificate.filePath = null;
   await certificate.save();
 
-  console.log(`[CertificateService] Generated certificate for: ${user.name}`);
+  logger.info('certificate.generation.single.completed', {
+    eventId: event._id.toString(),
+    userId: user._id.toString(),
+    issuerId: issuerId?.toString?.() || issuerId,
+    certificateId: certificate.certificateId,
+    fileId: certificate.pdfFileId?.toString?.() || certificate.pdfFileId,
+  });
 
   return {
     created: true,
@@ -229,7 +269,12 @@ const backfillCertificatePdf = async (certificate, pdfBuffer) => {
     certificate.filePath = null;
     await certificate.save();
   } catch (storeErr) {
-    console.error('Failed to store generated certificate in GridFS:', storeErr);
+    logger.error('certificate.gridfs.backfill.failed', {
+      certificateId: certificate.certificateId,
+      eventId: certificate.eventId?._id?.toString?.() || certificate.eventId?.toString?.(),
+      userId: certificate.userId?._id?.toString?.() || certificate.userId?.toString?.(),
+      error: storeErr,
+    });
   }
 };
 
