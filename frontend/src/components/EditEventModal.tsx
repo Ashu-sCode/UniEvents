@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { X, Upload } from 'lucide-react';
-import { eventsAPI } from '@/lib/api';
 import { getImageUrl, isValidImageType } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
 import type { Event } from '@/types';
+import { eventsAPI } from '@/lib/api';
 
 const DEPARTMENT_OPTIONS = [
   'Computer Science',
@@ -44,10 +44,8 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Fetch latest event data (ensures form is pre-filled from source of truth)
+  // Prefill from the event already loaded by the organizer dashboard.
   useEffect(() => {
-    let isMounted = true;
-
     const applyEventToForm = (e: Event) => {
       // Format date for input (YYYY-MM-DD)
       const eventDate = new Date(e.date);
@@ -69,32 +67,10 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
       setBannerPreview(e.bannerUrl ? getImageUrl(e.bannerUrl) : null);
     };
 
-    const fetchLatest = async () => {
-      setIsFetching(true);
-      try {
-        // Optimistic prefill from provided event, then refresh from API
-        applyEventToForm(event);
-
-        const res = await eventsAPI.getById(event._id);
-        const latest = res.data?.data?.event as Event | undefined;
-        if (isMounted && latest) applyEventToForm(latest);
-      } catch (err: any) {
-        // Don't block editing if fetch fails
-        if (isMounted) {
-          toast.warning('Could not refresh event details. Showing cached values.');
-          applyEventToForm(event);
-        }
-      } finally {
-        if (isMounted) setIsFetching(false);
-      }
-    };
-
-    fetchLatest();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [event, toast]);
+    setIsFetching(true);
+    applyEventToForm(event);
+    setIsFetching(false);
+  }, [event]);
 
   // Handle escape key and body scroll
   useEffect(() => {

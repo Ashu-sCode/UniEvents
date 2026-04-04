@@ -11,6 +11,20 @@ export interface User {
   createdAt?: string;
 }
 
+export interface SignupInput {
+  name: string;
+  email: string;
+  password: string;
+  rollNumber?: string;
+  department: string;
+  role: 'student' | 'organizer';
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
 // Event types
 export type EventType = 'public' | 'departmental';
 export type EventStatus = 'draft' | 'published' | 'ongoing' | 'completed' | 'cancelled';
@@ -37,6 +51,18 @@ export interface Event {
   updatedAt: string;
 }
 
+export interface EventFormInput {
+  title: string;
+  description: string;
+  eventType: EventType;
+  department: string;
+  seatLimit: number;
+  date: string;
+  time: string;
+  venue: string;
+  enableCertificates: boolean;
+}
+
 // Ticket types
 export type TicketStatus = 'unused' | 'used' | 'cancelled';
 
@@ -59,6 +85,13 @@ export interface Attendance {
   ticketId: Ticket | string;
   entryTime: string;
   verifiedBy: User | string;
+}
+
+export interface AttendanceStats {
+  totalRegistered: number;
+  totalAttended: number;
+  attendanceRate: string;
+  seatsAvailable: number;
 }
 
 // Certificate types
@@ -97,6 +130,46 @@ export interface ApiResponse<T> {
 
 export interface PaginatedResponse<T> extends ApiResponse<T> {
   count: number;
+  total?: number;
+  page?: number;
+  totalPages?: number;
+  limit?: number;
+}
+
+export interface ApiErrorResponse {
+  success: false;
+  message?: string;
+  errors?: string[];
+}
+
+export interface AuthPayload {
+  user: User;
+  token: string;
+}
+
+export interface UserPayload {
+  user: User;
+}
+
+export interface EventsPayload {
+  events: Event[];
+}
+
+export interface TicketsPayload {
+  tickets: Ticket[];
+}
+
+export interface CertificatesPayload {
+  certificates: Certificate[];
+}
+
+export interface RegistrationsPayload {
+  registrations: Ticket[];
+}
+
+export interface EventCertificatesPayload {
+  certificates: Certificate[];
+  stats: CertificateStats;
 }
 
 // Verification types

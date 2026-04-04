@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { X, Download, Loader2, Ticket } from 'lucide-react';
 import { ticketsAPI } from '@/lib/api';
 
+const ticketPreviewCache = new Map<string, string>();
+
 interface TicketPreviewModalProps {
   ticketId: string;
   eventTitle: string;
@@ -24,6 +26,14 @@ export default function TicketPreviewModal({
   // Fetch PDF with auth and create blob URL
   useEffect(() => {
     const fetchPdf = async () => {
+      const cachedUrl = ticketPreviewCache.get(ticketId);
+      if (cachedUrl) {
+        setPdfUrl(cachedUrl);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
@@ -34,6 +44,7 @@ export default function TicketPreviewModal({
         // Create blob URL from the response
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
+        ticketPreviewCache.set(ticketId, url);
         setPdfUrl(url);
       } catch (err: any) {
         console.error('Failed to load ticket preview:', err);
@@ -45,12 +56,6 @@ export default function TicketPreviewModal({
 
     fetchPdf();
 
-    // Cleanup blob URL on unmount
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
   }, [ticketId]);
 
   return (

@@ -1,12 +1,15 @@
 'use client';
 
+import type { AxiosError } from 'axios';
 import { useCallback } from 'react';
 import { useLoading } from '@/context/LoadingContext';
 import { useToast } from '@/context/ToastContext';
+import type { ApiErrorResponse } from '@/types';
 
 type MessageOrFactory<T> = string | ((value: T) => string);
 
-type ErrorMessageOrFactory = string | ((error: any) => string);
+type ApiError = AxiosError<ApiErrorResponse>;
+type ErrorMessageOrFactory = string | ((error: ApiError) => string);
 
 export interface RunApiOptions<T> {
   /** Defaults to true */
@@ -28,13 +31,13 @@ export interface RunApiOptions<T> {
   onSuccess?: (value: T) => void;
 
   /** Called after a failed request */
-  onError?: (error: any) => void;
+  onError?: (error: ApiError) => void;
 
   /** By default, errors are swallowed after showing toast. Set true if you want the error rethrown. */
   throwOnError?: boolean;
 }
 
-function getBackendErrorMessage(error: any): string | undefined {
+function getBackendErrorMessage(error: ApiError): string | undefined {
   return error?.response?.data?.message || error?.message;
 }
 
@@ -68,19 +71,20 @@ export function useApi() {
 
         onSuccess?.(value);
         return value;
-      } catch (err: any) {
+      } catch (err) {
+        const apiError = err as ApiError;
         if (rollback) rollback();
 
-        const backendMsg = getBackendErrorMessage(err);
+        const backendMsg = getBackendErrorMessage(apiError);
         const msg =
           typeof errorMessage === 'function'
-            ? errorMessage(err)
+            ? errorMessage(apiError)
             : errorMessage || backendMsg || 'Something went wrong';
 
         if (msg) toast.error(msg);
-        onError?.(err);
+        onError?.(apiError);
 
-        if (throwOnError) throw err;
+        if (throwOnError) throw apiError;
         return undefined;
       } finally {
         if (useGlobalLoader) hideGlobalLoader();

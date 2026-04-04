@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
 import { certificatesAPI } from '@/lib/api';
 
+const certificatePreviewCache = new Map<string, string>();
+
 interface CertificatePreviewModalProps {
   certificateId: string;
   eventTitle: string;
@@ -24,6 +26,14 @@ export default function CertificatePreviewModal({
   // Fetch PDF with auth and create blob URL
   useEffect(() => {
     const fetchPdf = async () => {
+      const cachedUrl = certificatePreviewCache.get(certificateId);
+      if (cachedUrl) {
+        setPdfUrl(cachedUrl);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
@@ -34,6 +44,7 @@ export default function CertificatePreviewModal({
         // Create blob URL from the response
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
+        certificatePreviewCache.set(certificateId, url);
         setPdfUrl(url);
       } catch (err: any) {
         console.error('Failed to load certificate preview:', err);
@@ -45,12 +56,6 @@ export default function CertificatePreviewModal({
 
     fetchPdf();
 
-    // Cleanup blob URL on unmount
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
   }, [certificateId]);
 
   return (

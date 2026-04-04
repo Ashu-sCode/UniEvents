@@ -1,4 +1,25 @@
-import axios from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
+import type {
+  ApiErrorResponse,
+  ApiResponse,
+  Attendance,
+  AttendanceStats,
+  AuthPayload,
+  CertificatesPayload,
+  Event,
+  EventCertificatesPayload,
+  EventFormInput,
+  EventsPayload,
+  LoginInput,
+  PaginatedResponse,
+  RegistrationsPayload,
+  SignupInput,
+  Ticket,
+  TicketsPayload,
+  User,
+  VerificationResult,
+  UserPayload,
+} from '@/types';
 
 // API URL with fallback to localhost
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -17,6 +38,10 @@ const api = axios.create({
   withCredentials: false,
 });
 
+type ApiResult<T> = AxiosResponse<ApiResponse<T>>;
+type PaginatedApiResult<T> = AxiosResponse<PaginatedResponse<T>>;
+type ApiFailure = AxiosError<ApiErrorResponse>;
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
@@ -29,7 +54,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    return Promise.reject(error);
+    return Promise.reject(error as ApiFailure);
   }
 );
 
@@ -48,7 +73,7 @@ api.interceptors.response.use(
         }
       }
     }
-    return Promise.reject(error);
+    return Promise.reject(error as ApiFailure);
   }
 );
 
@@ -56,24 +81,24 @@ export default api;
 
 // API helper functions
 export const authAPI = {
-  login: (data: { email: string; password: string }) => 
+  login: (data: LoginInput): Promise<ApiResult<AuthPayload>> =>
     api.post('/auth/login', data),
-  signup: (data: any) => 
+  signup: (data: SignupInput): Promise<ApiResult<AuthPayload>> =>
     api.post('/auth/signup', data),
-  getProfile: () => 
+  getProfile: (): Promise<ApiResult<UserPayload>> =>
     api.get('/auth/me'),
-  forgotPassword: (data: { email: string }) =>
+  forgotPassword: (data: { email: string }): Promise<ApiResult<Record<string, never>>> =>
     api.post('/auth/forgot-password', data),
-  resetPassword: (token: string, data: { password: string }) =>
+  resetPassword: (token: string, data: { password: string }): Promise<ApiResult<Record<string, never>>> =>
     api.post(`/auth/reset-password/${token}`, data),
 };
 
 export const eventsAPI = {
-  getAll: (params?: any) => 
+  getAll: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<EventsPayload>> =>
     api.get('/events', { params }),
-  getById: (id: string) => 
+  getById: (id: string): Promise<ApiResult<{ event: Event }>> =>
     api.get(`/events/${id}`),
-  create: (data: FormData | any) => {
+  create: (data: FormData | EventFormInput): Promise<ApiResult<{ event: Event }>> => {
     // Check if data is FormData for image upload
     if (data instanceof FormData) {
       return api.post('/events', data, {
@@ -82,7 +107,7 @@ export const eventsAPI = {
     }
     return api.post('/events', data);
   },
-  update: (id: string, data: FormData | any) => {
+  update: (id: string, data: FormData | Partial<EventFormInput> & { status?: Event['status'] }): Promise<ApiResult<{ event: Event; certificates?: unknown }>> => {
     // Check if data is FormData for image upload
     if (data instanceof FormData) {
       return api.put(`/events/${id}`, data, {
@@ -91,58 +116,58 @@ export const eventsAPI = {
     }
     return api.put(`/events/${id}`, data);
   },
-  delete: (id: string) => 
+  delete: (id: string): Promise<ApiResult<Record<string, never>>> =>
     api.delete(`/events/${id}`),
-  getRegistrations: (id: string) => 
+  getRegistrations: (id: string): Promise<ApiResult<RegistrationsPayload>> =>
     api.get(`/events/${id}/registrations`),
 };
 
 export const ticketsAPI = {
-  register: (eventId: string) => 
+  register: (eventId: string): Promise<ApiResult<{ ticket: Ticket }>> =>
     api.post(`/tickets/register/${eventId}`),
   // Backward compatible list
-  getMyTickets: (params?: any) => 
+  getMyTickets: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<TicketsPayload>> =>
     api.get('/tickets/my-tickets', { params }),
   // New alias list (supports pagination)
-  getAll: (params?: any) =>
+  getAll: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<TicketsPayload>> =>
     api.get('/tickets', { params }),
-  getById: (ticketId: string) => 
+  getById: (ticketId: string): Promise<ApiResult<{ ticket: Ticket }>> =>
     api.get(`/tickets/${ticketId}`),
-  verify: (data: { ticketId: string; eventId: string }) => 
+  verify: (data: { ticketId: string; eventId: string }): Promise<AxiosResponse<{ success: boolean; message: string; verification: VerificationResult }>> =>
     api.post('/tickets/verify', data),
-  cancel: (ticketId: string) =>
+  cancel: (ticketId: string): Promise<ApiResult<{ ticket: Ticket }>> =>
     api.patch(`/tickets/${ticketId}/cancel`),
-  download: (ticketId: string) => 
+  download: (ticketId: string): Promise<AxiosResponse<Blob>> =>
     api.get(`/tickets/${ticketId}/download`, { responseType: 'blob' }),
-  preview: (ticketId: string) => 
+  preview: (ticketId: string): Promise<AxiosResponse<Blob>> =>
     api.get(`/tickets/${ticketId}/preview`, { responseType: 'blob' }),
 };
 
 export const attendanceAPI = {
-  getMyAttendance: () => 
+  getMyAttendance: (): Promise<ApiResult<{ attendance: Attendance[] }>> =>
     api.get('/attendance/my-attendance'),
-  getEventAttendance: (eventId: string) => 
+  getEventAttendance: (eventId: string): Promise<ApiResult<{ event: Pick<Event, 'title' | 'date' | 'registeredCount'>; attendance: Attendance[] }>> =>
     api.get(`/attendance/event/${eventId}`),
-  getEventStats: (eventId: string) => 
+  getEventStats: (eventId: string): Promise<ApiResult<{ stats: AttendanceStats }>> =>
     api.get(`/attendance/event/${eventId}/stats`),
 };
 
 export const certificatesAPI = {
-  getMyCertificates: () => 
+  getMyCertificates: (): Promise<ApiResult<CertificatesPayload>> =>
     api.get('/certificates/my-certificates'),
-  generate: (eventId: string) => 
+  generate: (eventId: string): Promise<ApiResult<{ totalAttendees: number; generated: number; skipped: number; errors?: Array<{ userId: string; error: string }> }>> =>
     api.post(`/certificates/generate/${eventId}`),
-  download: (certificateId: string) => 
+  download: (certificateId: string): Promise<AxiosResponse<Blob>> =>
     api.get(`/certificates/${certificateId}/download`, { responseType: 'blob' }),
-  preview: (certificateId: string) => 
+  preview: (certificateId: string): Promise<AxiosResponse<Blob>> =>
     api.get(`/certificates/${certificateId}/preview`, { responseType: 'blob' }),
-  getEventCertificates: (eventId: string) => 
+  getEventCertificates: (eventId: string): Promise<ApiResult<EventCertificatesPayload>> =>
     api.get(`/certificates/event/${eventId}`),
 };
 
 export const usersAPI = {
-  getMe: () => api.get('/users/me'),
-  updateMe: (data: FormData | any) => {
+  getMe: (): Promise<ApiResult<UserPayload>> => api.get('/users/me'),
+  updateMe: (data: FormData | Partial<Pick<User, 'name' | 'phone' | 'department'>>): Promise<ApiResult<UserPayload>> => {
     if (data instanceof FormData) {
       return api.put('/users/me', data, {
         headers: { 'Content-Type': 'multipart/form-data' }

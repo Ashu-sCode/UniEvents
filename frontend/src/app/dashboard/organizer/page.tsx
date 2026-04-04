@@ -13,7 +13,7 @@ import {
   BarChart3, Eye, Camera, Keyboard, Award, Upload, X,
   Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin, UserCircle
 } from 'lucide-react';
-import type { Event, EventStatus } from '@/types';
+import type { Event, EventStatus, EventType } from '@/types';
 import CameraScan from '@/components/CameraScan';
 import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -530,7 +530,17 @@ function EventCard({ event, onScan, onEdit, onDelete, onView, isDeleting, onSetS
 function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCreate, onRollbackCreate }: any) {
   const toast = useToast();
   const api = useApi();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    title: string;
+    description: string;
+    eventType: EventType;
+    department: string;
+    seatLimit: number;
+    date: string;
+    time: string;
+    venue: string;
+    enableCertificates: boolean;
+  }>({
     title: '',
     description: '',
     eventType: 'public',
@@ -678,7 +688,7 @@ function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCrea
                 <label className="label">Event Type</label>
                 <select
                   value={formData.eventType}
-                  onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, eventType: e.target.value as EventType })}
                   className="input"
                 >
                   <option value="public">Public</option>

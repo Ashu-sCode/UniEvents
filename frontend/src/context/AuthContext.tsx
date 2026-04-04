@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import type { User } from '@/types';
+import type { SignupInput, User } from '@/types';
 import { useLoading } from '@/context/LoadingContext';
 
 interface AuthContextType {
@@ -12,19 +12,10 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (data: SignupData) => Promise<void>;
+  signup: (data: SignupInput) => Promise<void>;
   logout: () => void;
   /** Update cached user in state + localStorage (used by Profile module). */
   updateUser: (user: User) => void;
-}
-
-interface SignupData {
-  name: string;
-  email: string;
-  password: string;
-  rollNumber?: string;
-  department: string;
-  role: 'student' | 'organizer';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (data: SignupData) => {
+  const signup = async (data: SignupInput) => {
     showGlobalLoader();
     try {
       const response = await api.post('/auth/signup', data);

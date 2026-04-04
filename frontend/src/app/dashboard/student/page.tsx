@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -62,6 +62,8 @@ export default function StudentDashboard() {
   const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
   const [previewTicket, setPreviewTicket] = useState<TicketType | null>(null);
   const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
+  const skipNextEventsEffect = useRef(true);
+  const skipNextTicketsEffect = useRef(true);
 
   // Read initial page state from query string (client-side) to avoid Next.js useSearchParams SSR issues
   useEffect(() => {
@@ -149,11 +151,19 @@ export default function StudentDashboard() {
   }, []);
 
   useEffect(() => {
+    if (skipNextEventsEffect.current) {
+      skipNextEventsEffect.current = false;
+      return;
+    }
     fetchEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventsPage, eventSearch, eventDepartment, eventType, dateFrom, dateTo]);
 
   useEffect(() => {
+    if (skipNextTicketsEffect.current) {
+      skipNextTicketsEffect.current = false;
+      return;
+    }
     fetchTicketsPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketsPage]);
@@ -164,8 +174,29 @@ export default function StudentDashboard() {
     await api.run(() => ticketsAPI.register(eventId), {
       successMessage: 'Successfully registered for the event',
       errorMessage: (err) => err?.response?.data?.message || 'Registration failed',
-      onSuccess: async () => {
-        await Promise.all([fetchEvents(), fetchTicketsAll(), fetchTicketsPage()]);
+      onSuccess: (response) => {
+        const newTicket = response.data.data.ticket;
+        const nextTotal = ticketsTotal + 1;
+
+        setTicketsAll((prev) => [newTicket, ...prev]);
+        setTicketsTotal(nextTotal);
+        setTicketsTotalPages(Math.max(1, Math.ceil(nextTotal / TICKETS_LIMIT)));
+
+        if (ticketsPage === 1) {
+          setTicketsPageItems((prev) => [newTicket, ...prev].slice(0, TICKETS_LIMIT));
+        }
+
+        setEvents((prev) =>
+          prev.map((event) =>
+            event._id === eventId
+              ? {
+                  ...event,
+                  registeredCount: event.registeredCount + 1,
+                  seatsAvailable: Math.max(0, event.seatsAvailable - 1),
+                }
+              : event
+          )
+        );
       },
     });
 
