@@ -13,7 +13,7 @@ import {
   BarChart3, Eye, Camera, Keyboard, Award, Upload, X,
   Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin, UserCircle
 } from 'lucide-react';
-import type { Event, EventStatus, EventType, OrganizerAnalyticsSummary } from '@/types';
+import type { Event, EventStatus, EventType } from '@/types';
 import CameraScan from '@/components/CameraScan';
 import { NotificationBell } from '@/components/NotificationBell';
 import { EditEventModal } from '@/components/EditEventModal';
@@ -29,20 +29,6 @@ export default function OrganizerDashboard() {
   const toast = useToast();
   const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
-  const showAnalytics = false;
-  const summary: OrganizerAnalyticsSummary = {
-    totalEvents: 0,
-    totalRegistrations: 0,
-    totalAttendance: 0,
-    totalNoShows: 0,
-    overallAttendanceRate: '0%',
-    certificatesIssued: 0,
-    certificateCoverageRate: '0%',
-    performanceSummary: '',
-    eventSummaries: [],
-    topPerformer: null,
-    needsAttention: null,
-  };
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
@@ -241,68 +227,6 @@ export default function OrganizerDashboard() {
             value={events.filter(e => e.status === 'completed').length}
           />
         </div>
-
-        {showAnalytics && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10">
-            <div className="lg:col-span-3 bg-white rounded-2xl border border-neutral-100 p-6">
-              <p className="text-sm text-neutral-500">Overall performance</p>
-              <h2 className="mt-2 text-xl font-semibold text-neutral-900">
-                {summary.performanceSummary}
-              </h2>
-              <p className="mt-2 text-sm text-neutral-600">
-                Attendance coverage <strong className="text-neutral-900">{summary.overallAttendanceRate}</strong>
-                {' '}· Certificate coverage <strong className="text-neutral-900">{summary.certificateCoverageRate}</strong>
-              </p>
-            </div>
-
-            <SummaryCard
-              title="Top Performer"
-              summary={summary.topPerformer}
-              fallback="No event performance data yet."
-            />
-            <SummaryCard
-              title="Needs Attention"
-              summary={summary.needsAttention}
-              fallback="No low-performing event detected."
-            />
-            <div className="bg-white rounded-2xl border border-neutral-100 p-6">
-              <p className="text-sm text-neutral-500">Cross-event snapshot</p>
-              <div className="mt-4 space-y-3 text-sm text-neutral-700">
-                <p>Total registrations: <strong className="text-neutral-900">{summary.totalRegistrations}</strong></p>
-                <p>Total attendance: <strong className="text-neutral-900">{summary.totalAttendance}</strong></p>
-                <p>Total no-shows: <strong className="text-neutral-900">{summary.totalNoShows}</strong></p>
-                <p>Certificates issued: <strong className="text-neutral-900">{summary.certificatesIssued}</strong></p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showAnalytics && summary.eventSummaries.length > 0 && (
-          <div className="bg-white rounded-2xl border border-neutral-100 p-6 mb-10">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <h2 className="text-lg font-semibold text-neutral-900">Event Performance</h2>
-              <span className="text-sm text-neutral-500">{summary.eventSummaries.length} tracked events</span>
-            </div>
-            <div className="space-y-3">
-              {summary.eventSummaries.slice(0, 5).map((item) => (
-                <div key={item.eventId} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-neutral-100 rounded-2xl p-4">
-                  <div>
-                    <p className="font-medium text-neutral-900">{item.title}</p>
-                    <p className="text-sm text-neutral-500">
-                      {item.department} · {item.eventType} · {formatDate(item.date)}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    <MetricPill label="Registered" value={item.registeredCount} />
-                    <MetricPill label="Attended" value={item.attendedCount} />
-                    <MetricPill label="No-shows" value={item.noShowCount} />
-                    <MetricPill label="Attendance" value={item.attendanceRate} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Header & Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -514,47 +438,6 @@ function OrganizerHighlight({ value, label, helper }: { value: number | string; 
       <p className="text-2xl font-semibold text-white">{value}</p>
       <p className="mt-1 text-sm font-medium text-slate-100">{label}</p>
       <p className="mt-2 text-xs leading-5 text-slate-300">{helper}</p>
-    </div>
-  );
-}
-
-function MetricPill({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="bg-neutral-50 rounded-xl px-3 py-2">
-      <p className="text-xs text-neutral-500">{label}</p>
-      <p className="text-sm font-semibold text-neutral-900">{value}</p>
-    </div>
-  );
-}
-
-function SummaryCard({
-  title,
-  summary,
-  fallback,
-}: {
-  title: string;
-  summary: OrganizerAnalyticsSummary['topPerformer'];
-  fallback: string;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-neutral-100 p-6">
-      <p className="text-sm text-neutral-500">{title}</p>
-      {summary ? (
-        <>
-          <h3 className="mt-2 text-lg font-semibold text-neutral-900">{summary.title}</h3>
-          <p className="mt-1 text-sm text-neutral-500">
-            {summary.department} · {summary.eventType} · {formatDate(summary.date)}
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <MetricPill label="Attendance" value={summary.attendanceRate} />
-            <MetricPill label="No-shows" value={summary.noShowCount} />
-            <MetricPill label="Attended" value={summary.attendedCount} />
-            <MetricPill label="Certificates" value={summary.certificateIssuedCount} />
-          </div>
-        </>
-      ) : (
-        <p className="mt-2 text-sm text-neutral-500">{fallback}</p>
-      )}
     </div>
   );
 }
