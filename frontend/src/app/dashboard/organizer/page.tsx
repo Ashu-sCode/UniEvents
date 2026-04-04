@@ -18,6 +18,7 @@ import CameraScan from '@/components/CameraScan';
 import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { AsyncImage, Button } from '@/components/ui';
+import { STREAM_OPTIONS } from '@/constants/streams';
 
 const ORGANIZER_FILTERS_STORAGE_KEY = 'unievent.organizer.filters';
 
@@ -882,13 +883,19 @@ function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCrea
               </div>
               <div>
                 <label className="label">Department</label>
-                <input
-                  type="text"
+                <select
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                   className="input"
                   required
-                />
+                >
+                  <option value="">Select Department</option>
+                  {STREAM_OPTIONS.map((stream) => (
+                    <option key={stream.value} value={stream.value}>
+                      {stream.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

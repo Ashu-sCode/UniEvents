@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useLoading } from '@/context/LoadingContext';
 import type { User } from '@/types';
+import { STREAM_OPTIONS } from '@/constants/streams';
 
 type FormState = {
   name: string;
@@ -135,14 +136,26 @@ export default function ProfileForm() {
             placeholder="+91 9XXXXXXXXX"
           />
 
-          <Input
-            label="Department"
-            value={form.department}
-            disabled={isLoading || isSaving}
-            onChange={(e) => setForm((p) => ({ ...p, department: e.target.value }))}
-            placeholder="Computer Science"
-            required
-          />
+          <div>
+            <label className="label">Department</label>
+            <select
+              value={form.department}
+              disabled={isLoading || isSaving}
+              onChange={(e) => setForm((p) => ({ ...p, department: e.target.value }))}
+              className="input"
+              required
+            >
+              {form.department && !STREAM_OPTIONS.some((stream) => stream.value === form.department) && (
+                <option value={form.department}>{form.department}</option>
+              )}
+              <option value="">Select Department</option>
+              {STREAM_OPTIONS.map((stream) => (
+                <option key={stream.value} value={stream.value}>
+                  {stream.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <Input
             label="Email (read-only)"

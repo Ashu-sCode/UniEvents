@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Ticket, Eye, EyeOff, User, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button, Card } from '@/components/ui';
+import { STREAM_OPTIONS } from '@/constants/streams';
 
 export default function SignupClient() {
   const searchParams = useSearchParams();
@@ -160,14 +161,11 @@ export default function SignupClient() {
                 required
               >
                 <option value="">Select Department</option>
-                <option value="Computer Science">Bachelor of Computer Application</option>
-                <option value="Electrical Engineering">Bachelor of Science</option>
-                <option value="Mechanical Engineering">Bachelor of Arts</option>
-                <option value="Civil Engineering">Bachelor of Commerce</option>
-                <option value="Electronics">Bachelor of Education</option>
-                <option value="Information Technology">Bachelor of Business Administration</option>
-                <option value="MBA">Diploma</option>
-                <option value="Other">Other</option>
+                {STREAM_OPTIONS.map((stream) => (
+                  <option key={stream.value} value={stream.value}>
+                    {stream.label}
+                  </option>
+                ))}
               </select>
             </div>
 

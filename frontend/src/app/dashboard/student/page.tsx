@@ -16,19 +16,10 @@ import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
 import { AsyncImage, LoadingGrid, SectionLoader } from '@/components/ui';
-
-const DEPARTMENT_OPTIONS = [
-  'Computer Science',
-  'Electrical Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Electronics',
-  'Information Technology',
-  'MBA',
-  'Other',
-];
+import { STREAM_OPTIONS } from '@/constants/streams';
 
 const STUDENT_FILTERS_STORAGE_KEY = 'unievent.student.filters';
+const SEEN_PROMOTION_STORAGE_KEY = 'unievent.student.seenPromotions';
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -68,8 +59,58 @@ export default function StudentDashboard() {
   const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
   const [previewTicket, setPreviewTicket] = useState<TicketType | null>(null);
   const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
+  const [recentPromotion, setRecentPromotion] = useState<TicketType | null>(null);
   const skipNextEventsEffect = useRef(true);
   const skipNextTicketsEffect = useRef(true);
+  const knownTicketStatusesRef = useRef<Record<string, TicketType['status']>>({});
+
+  const markPromotionSeen = (ticketId: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const current = JSON.parse(window.localStorage.getItem(SEEN_PROMOTION_STORAGE_KEY) || '[]') as string[];
+      if (!current.includes(ticketId)) {
+        window.localStorage.setItem(
+          SEEN_PROMOTION_STORAGE_KEY,
+          JSON.stringify([...current, ticketId])
+        );
+      }
+    } catch {
+      // Ignore local storage issues for non-critical demo polish.
+    }
+  };
+
+  const hasSeenPromotion = (ticketId: string) => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const current = JSON.parse(window.localStorage.getItem(SEEN_PROMOTION_STORAGE_KEY) || '[]') as string[];
+      return current.includes(ticketId);
+    } catch {
+      return false;
+    }
+  };
+
+  const detectPromotions = (incomingTickets: TicketType[]) => {
+    const previousStatuses = knownTicketStatusesRef.current;
+    const nextStatuses: Record<string, TicketType['status']> = {};
+
+    incomingTickets.forEach((ticket) => {
+      nextStatuses[ticket.ticketId] = ticket.status;
+
+      const previousStatus = previousStatuses[ticket.ticketId];
+      const wasPromoted =
+        ticket.status === 'unused' &&
+        Boolean(ticket.promotedAt) &&
+        (previousStatus === 'waitlisted' || !hasSeenPromotion(ticket.ticketId));
+
+      if (wasPromoted) {
+        setRecentPromotion(ticket);
+        toast.success('A waitlisted ticket has been promoted to a confirmed seat.');
+        markPromotionSeen(ticket.ticketId);
+      }
+    });
+
+    knownTicketStatusesRef.current = nextStatuses;
+  };
 
   // Read initial page state from query string (client-side) to avoid Next.js useSearchParams SSR issues
   useEffect(() => {
@@ -165,7 +206,9 @@ export default function StudentDashboard() {
   const fetchTicketsAll = async () => {
     try {
       const ticketsRes = await ticketsAPI.getMyTickets();
-      setTicketsAll(ticketsRes.data.data.tickets);
+      const nextTickets = ticketsRes.data.data.tickets;
+      setTicketsAll(nextTickets);
+      detectPromotions(nextTickets);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to load tickets');
     }
@@ -228,6 +271,34 @@ export default function StudentDashboard() {
     fetchTicketsPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketFilter, ticketsPage]);
+
+  useEffect(() => {
+    if (activeTab !== 'tickets') {
+      return;
+    }
+
+    fetchTicketsAll();
+    fetchTicketsPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  useEffect(() => {
+    const refreshTicketsIfNeeded = () => {
+      if (document.visibilityState === 'visible' && activeTab === 'tickets') {
+        fetchTicketsAll();
+        fetchTicketsPage();
+      }
+    };
+
+    window.addEventListener('focus', refreshTicketsIfNeeded);
+    document.addEventListener('visibilitychange', refreshTicketsIfNeeded);
+
+    return () => {
+      window.removeEventListener('focus', refreshTicketsIfNeeded);
+      document.removeEventListener('visibilitychange', refreshTicketsIfNeeded);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, ticketFilter, ticketsPage]);
 
   const handleRegister = async (eventId: string) => {
     setRegisteringEventId(eventId);
@@ -487,9 +558,9 @@ export default function StudentDashboard() {
                     className="input"
                   >
                     <option value="">All Departments</option>
-                    {DEPARTMENT_OPTIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
+                    {STREAM_OPTIONS.map((stream) => (
+                      <option key={stream.value} value={stream.value}>
+                        {stream.label}
                       </option>
                     ))}
                   </select>
@@ -600,6 +671,24 @@ export default function StudentDashboard() {
             </div>
           ) : (
           <div className="space-y-4">
+            {recentPromotion && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                Your waitlisted seat for{' '}
+                <strong>
+                  {typeof recentPromotion.eventId === 'object'
+                    ? recentPromotion.eventId?.title || 'your event'
+                    : 'your event'}
+                </strong>{' '}
+                has been confirmed. Your ticket is now ready to use.
+                <button
+                  onClick={() => setRecentPromotion(null)}
+                  className="ml-3 rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {/* Filter pills */}
             <div className="flex flex-wrap gap-2">
               {([

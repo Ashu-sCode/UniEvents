@@ -7,17 +7,7 @@ import { useToast } from '@/context/ToastContext';
 import type { Event } from '@/types';
 import { eventsAPI } from '@/lib/api';
 import { AsyncImage, Button, ModalPreviewLoader } from '@/components/ui';
-
-const DEPARTMENT_OPTIONS = [
-  'Computer Science',
-  'Electrical Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Electronics',
-  'Information Technology',
-  'MBA',
-  'Other',
-];
+import { STREAM_OPTIONS } from '@/constants/streams';
 
 interface EditEventModalProps {
   event: Event;
@@ -214,13 +204,13 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
                   required
                   disabled={isLoading || isFetching}
                 >
-                  {formData.department && !DEPARTMENT_OPTIONS.includes(formData.department) && (
+                  {formData.department && !STREAM_OPTIONS.some((stream) => stream.value === formData.department) && (
                     <option value={formData.department}>{formData.department}</option>
                   )}
                   <option value="">Select Department</option>
-                  {DEPARTMENT_OPTIONS.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
+                  {STREAM_OPTIONS.map((stream) => (
+                    <option key={stream.value} value={stream.value}>
+                      {stream.label}
                     </option>
                   ))}
                 </select>
