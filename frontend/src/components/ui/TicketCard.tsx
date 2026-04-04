@@ -1,7 +1,9 @@
 'use client';
 
-import { Ticket as TicketIcon, Calendar, Clock, MapPin, User, Hash, Building2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Building2, Calendar, Clock, MapPin, QrCode, Ticket as TicketIcon, User } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+
 import { cn } from '@/lib/utils';
 
 interface TicketCardProps {
@@ -24,120 +26,97 @@ interface TicketCardProps {
   className?: string;
 }
 
+const statusStyles = {
+  unused: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  used: 'bg-neutral-100 text-neutral-700 border-neutral-200',
+  cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
+};
+
 export function TicketCard({ ticket, compact = false, className }: TicketCardProps) {
   const event = ticket.eventId;
   const user = ticket.userId;
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
-  };
-
-  const statusStyles = {
-    unused: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    used: 'bg-neutral-100 text-neutral-600 border-neutral-200',
-    cancelled: 'bg-red-50 text-red-600 border-red-200',
-  };
 
   return (
     <div
       className={cn(
-        'relative bg-white rounded-2xl shadow-lg border border-neutral-100 overflow-hidden',
-        'max-w-sm mx-auto',
+        'relative mx-auto max-w-md overflow-hidden rounded-[2rem] border border-neutral-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.10)]',
         className
       )}
     >
-      {/* Decorative notches */}
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-neutral-50 rounded-r-full -ml-2" />
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-neutral-50 rounded-l-full -mr-2" />
+      <div className="absolute inset-y-[46%] left-0 z-10 h-9 w-5 -translate-x-1/2 rounded-full bg-[#eef2f7]" />
+      <div className="absolute inset-y-[46%] right-0 z-10 h-9 w-5 translate-x-1/2 rounded-full bg-[#eef2f7]" />
 
-      {/* Header */}
-      <div className="bg-gradient-to-br from-neutral-800 to-neutral-900 px-6 py-5 text-white">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <TicketIcon className="h-5 w-5 text-neutral-300" />
-            <span className="text-sm font-medium text-neutral-300">UniEvent</span>
+      <div className="bg-[linear-gradient(135deg,#0f172a_0%,#111827_55%,#14532d_100%)] px-6 py-5 text-white">
+        <div className="flex items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
+            <TicketIcon className="h-3.5 w-3.5" />
+            UniEvent pass
           </div>
-          <span
-            className={cn(
-              'text-xs font-semibold px-2.5 py-1 rounded-full border',
-              statusStyles[ticket.status]
-            )}
-          >
-            {ticket.status.toUpperCase()}
+          <span className={cn('rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]', statusStyles[ticket.status])}>
+            {ticket.status}
           </span>
         </div>
-        <h2 className="text-xl font-bold leading-tight">{event.title}</h2>
+        <h2 className="mt-5 text-2xl font-semibold leading-tight">{event.title}</h2>
+        <p className="mt-2 text-sm text-slate-300">Movie-ticket inspired entry pass with QR verification.</p>
       </div>
 
-      {/* Event Details */}
-      <div className="px-6 py-4 border-b border-dashed border-neutral-200">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-start gap-2.5">
-            <Calendar className="h-4 w-4 text-neutral-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-xs text-neutral-500 uppercase tracking-wide">Date</p>
-              <p className="text-sm font-medium text-neutral-800">{formatDate(event.date)}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <Clock className="h-4 w-4 text-neutral-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-xs text-neutral-500 uppercase tracking-wide">Time</p>
-              <p className="text-sm font-medium text-neutral-800">{event.time}</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-start gap-2.5 mt-3">
-          <MapPin className="h-4 w-4 text-neutral-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-wide">Venue</p>
-            <p className="text-sm font-medium text-neutral-800">{event.venue}</p>
-          </div>
+      <div className="border-b border-dashed border-neutral-200 px-6 py-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Detail label="Date" value={formatDate(event.date)} icon={<Calendar className="h-4 w-4 text-neutral-400" />} />
+          <Detail label="Time" value={event.time} icon={<Clock className="h-4 w-4 text-neutral-400" />} />
+          <Detail label="Venue" value={event.venue} icon={<MapPin className="h-4 w-4 text-neutral-400" />} />
+          <Detail label="Department" value={user.department} icon={<Building2 className="h-4 w-4 text-neutral-400" />} />
         </div>
       </div>
 
-      {/* Attendee Details */}
-      <div className="px-6 py-4 border-b border-dashed border-neutral-200 bg-neutral-50/50">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2.5">
-            <User className="h-4 w-4 text-neutral-400 flex-shrink-0" />
-            <span className="text-sm font-semibold text-neutral-800">{user.name}</span>
-          </div>
-          {user.rollNumber && (
-            <div className="flex items-center gap-2.5">
-              <Hash className="h-4 w-4 text-neutral-400 flex-shrink-0" />
-              <span className="text-sm text-neutral-600">{user.rollNumber}</span>
+      <div className="grid gap-5 px-6 py-5 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="space-y-3">
+          <div className="rounded-[1.35rem] border border-neutral-200 bg-neutral-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">Attendee</p>
+            <div className="mt-2 flex items-center gap-2">
+              <User className="h-4 w-4 text-neutral-400" />
+              <p className="font-semibold text-neutral-900">{user.name}</p>
             </div>
-          )}
-          <div className="flex items-center gap-2.5">
-            <Building2 className="h-4 w-4 text-neutral-400 flex-shrink-0" />
-            <span className="text-sm text-neutral-600">{user.department}</span>
+            {user.rollNumber ? (
+              <p className="mt-2 font-mono text-sm text-neutral-600">{user.rollNumber}</p>
+            ) : null}
+          </div>
+
+          <div className="rounded-[1.35rem] border border-neutral-200 bg-neutral-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">Ticket ID</p>
+            <p className="mt-2 font-mono text-sm text-neutral-800">{ticket.ticketId}</p>
+            <p className="mt-2 text-xs text-neutral-500">Show this QR at entry for verification.</p>
           </div>
         </div>
-      </div>
 
-      {/* QR Code Section */}
-      <div className="px-6 py-5 flex flex-col items-center">
-        <div className="bg-white p-3 rounded-xl border border-neutral-100 shadow-sm">
-          <QRCodeSVG
-            value={ticket.ticketId}
-            size={compact ? 120 : 140}
-            level="H"
-            includeMargin={false}
-          />
+        <div className="mx-auto flex flex-col items-center rounded-[1.5rem] border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+            <QrCode className="h-3.5 w-3.5" />
+            Scan to verify
+          </div>
+          <QRCodeSVG value={ticket.ticketId} size={compact ? 112 : 148} level="H" includeMargin={false} />
         </div>
-        <p className="mt-3 text-xs font-mono text-neutral-500 tracking-wider">
-          {ticket.ticketId}
-        </p>
-        <p className="mt-2 text-xs text-neutral-400 text-center">
-          Show this ticket at entry
-        </p>
       </div>
+    </div>
+  );
+}
+
+function Detail({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
+  return (
+    <div className="rounded-[1.25rem] border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <div className="flex items-center gap-2">
+        {icon}
+        <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">{label}</p>
+      </div>
+      <p className="mt-2 text-sm font-medium text-neutral-800">{value || '-'}</p>
     </div>
   );
 }

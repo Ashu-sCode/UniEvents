@@ -994,107 +994,182 @@ function QRScanModal({ event, onClose }: any) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full shadow-lg">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-neutral-900">Verify Tickets</h2>
-            <button onClick={onClose} className="p-1 text-neutral-400 hover:text-neutral-600 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          
-          <p className="text-sm text-neutral-600 mb-6">
-            Event: <strong className="text-neutral-900">{event.title}</strong>
-          </p>
-
-          {/* Mode Selection */}
-          {mode === 'choose' && !result && (
-            <div className="space-y-3 mb-4">
-              <button
-                onClick={() => setMode('camera')}
-                className="w-full flex items-center justify-center gap-3 p-4 bg-neutral-900 hover:bg-neutral-800 text-white rounded-2xl transition-all hover:scale-[1.02]"
-              >
-                <Camera className="w-5 h-5" />
-                <span className="font-medium">Scan QR Code</span>
-              </button>
-              
-              <button
-                onClick={() => setMode('manual')}
-                className="w-full flex items-center justify-center gap-3 p-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 rounded-2xl transition-all"
-              >
-                <Keyboard className="w-5 h-5" />
-                <span className="font-medium">Enter Ticket ID Manually</span>
-              </button>
-            </div>
-          )}
-
-          {/* Manual Entry Mode */}
-          {mode === 'manual' && (
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-neutral-700 mb-2">Enter Ticket ID</label>
-              <input
-                type="text"
-                value={ticketId}
-                onChange={(e) => setTicketId(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === 'Enter' && handleVerify(ticketId)}
-                className="w-full px-4 py-3 border border-neutral-200 rounded-xl font-mono text-center focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent mb-3"
-                placeholder="TKT-XXXXXXXX"
-                autoFocus
-              />
-              <div className="flex gap-2">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/15 bg-neutral-950 text-white shadow-[0_30px_100px_rgba(0,0,0,0.45)]">
+        <div className="grid lg:grid-cols-[0.92fr_1.08fr]">
+          <aside className="relative overflow-hidden border-b border-white/10 bg-[linear-gradient(140deg,#0f172a_0%,#111827_48%,#14532d_100%)] p-6 lg:border-b-0 lg:border-r">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.24),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.18),transparent_38%)]" />
+            <div className="relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
+                    <QrCode className="h-3.5 w-3.5" />
+                    Live check-in
+                  </div>
+                  <h2 className="mt-4 text-2xl font-semibold tracking-tight">Verify tickets faster</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Scan the QR code or verify manually while keeping the organizer flow aligned with the new app design.
+                  </p>
+                </div>
                 <button
-                  onClick={() => setMode('choose')}
-                  className="flex-1 py-2.5 px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl font-medium transition-colors"
+                  onClick={onClose}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
+                  aria-label="Close verify tickets modal"
                 >
-                  Back
-                </button>
-                <button
-                  onClick={() => handleVerify(ticketId)}
-                  disabled={isVerifying || !ticketId.trim()}
-                  className="flex-1 py-2.5 px-4 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl font-medium transition-colors"
-                >
-                  {isVerifying ? 'Verifying...' : 'Verify'}
+                  <X className="h-5 w-5" />
                 </button>
               </div>
-            </div>
-          )}
 
-          {/* Result */}
-          {result && (
-            <div className="mb-4">
-              <div className={`p-4 rounded-2xl ${result.success ? 'bg-neutral-50 border border-neutral-200' : 'bg-neutral-50 border border-neutral-200'}`}>
-                {result.success ? (
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+              <div className="mt-8 rounded-[1.75rem] border border-white/10 bg-white/10 p-5 backdrop-blur">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Event</p>
+                <p className="mt-3 text-xl font-semibold leading-snug text-white">{event.title}</p>
+                <p className="mt-4 text-sm text-slate-300">
+                  Successful entry verification marks attendance immediately and sends a notification to the student.
+                </p>
+              </div>
+            </div>
+          </aside>
+
+          <section className="bg-[#f8fafc] p-6 text-neutral-900">
+            {!result && mode === 'choose' && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">Choose verification method</p>
+                  <p className="mt-1 text-sm text-neutral-500">Use the camera for live scanning or type a ticket ID when needed.</p>
+                </div>
+                <button
+                  onClick={() => setMode('camera')}
+                  className="group w-full rounded-[1.75rem] border border-neutral-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-900 text-white">
+                      <Camera className="h-5 w-5" />
+                    </div>
                     <div>
-                      <p className="font-semibold text-neutral-900">Entry Verified!</p>
-                      <p className="text-sm text-neutral-600">
-                        {result.data.verification.attendee.name}
-                      </p>
-                      <p className="text-sm text-neutral-500">
-                        {result.data.verification.attendee.rollNumber} · {result.data.verification.attendee.department}
+                      <p className="text-base font-semibold text-neutral-900">Scan QR ticket</p>
+                      <p className="mt-1 text-sm leading-6 text-neutral-500">
+                        Best for live check-in at the venue. Camera feedback now stays in one continuous verification flow.
                       </p>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex items-start gap-3">
-                    <XCircle className="h-6 w-6 text-red-400 flex-shrink-0" />
+                </button>
+
+                <button
+                  onClick={() => setMode('manual')}
+                  className="group w-full rounded-[1.75rem] border border-neutral-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-800">
+                      <Keyboard className="h-5 w-5" />
+                    </div>
                     <div>
-                      <p className="font-semibold text-neutral-900">Verification Failed</p>
-                      <p className="text-sm text-red-400">{result.message}</p>
+                      <p className="text-base font-semibold text-neutral-900">Enter ticket ID manually</p>
+                      <p className="mt-1 text-sm leading-6 text-neutral-500">
+                        Useful when the QR is damaged or the attendee prefers manual verification.
+                      </p>
                     </div>
                   </div>
-                )}
+                </button>
               </div>
-              <button
-                onClick={() => setResult(null)}
-                className="w-full mt-3 py-2.5 px-4 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl font-medium transition-colors"
-              >
-                Scan Another Ticket
-              </button>
-            </div>
-          )}
+            )}
+
+            {mode === 'manual' && !result && (
+              <div className="rounded-[1.75rem] border border-neutral-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">Manual verification</p>
+                    <p className="mt-1 text-sm text-neutral-500">Enter the attendee ticket ID exactly as shown.</p>
+                  </div>
+                  <button
+                    onClick={() => setMode('choose')}
+                    className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                  >
+                    Back
+                  </button>
+                </div>
+
+                <label className="block text-sm font-medium text-neutral-700">Ticket ID</label>
+                <input
+                  type="text"
+                  value={ticketId}
+                  onChange={(e) => setTicketId(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleVerify(ticketId)}
+                  className="mt-2 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 font-mono text-center text-sm text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:ring-2 focus:ring-neutral-900/70"
+                  placeholder="TKT-XXXXXXXX"
+                  autoFocus
+                />
+
+                <div className="mt-4 flex gap-3">
+                  <button
+                    onClick={() => setMode('choose')}
+                    className="flex-1 rounded-2xl border border-neutral-200 bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleVerify(ticketId)}
+                    disabled={isVerifying || !ticketId.trim()}
+                    className="flex-1 rounded-2xl bg-neutral-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:bg-neutral-300"
+                  >
+                    {isVerifying ? 'Verifying...' : 'Verify ticket'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {result && (
+              <div className="rounded-[1.75rem] border border-neutral-200 bg-white p-5 shadow-sm">
+                <div
+                  className={`rounded-[1.5rem] border p-4 ${
+                    result.success
+                      ? 'border-emerald-200 bg-emerald-50'
+                      : 'border-rose-200 bg-rose-50'
+                  }`}
+                >
+                  {result.success ? (
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />
+                      <div>
+                        <p className="font-semibold text-neutral-900">Entry verified</p>
+                        <p className="mt-1 text-sm text-neutral-700">{result.data.verification.attendee.name}</p>
+                        <p className="mt-1 text-sm text-neutral-500">
+                          {result.data.verification.attendee.rollNumber} · {result.data.verification.attendee.department}
+                        </p>
+                        <p className="mt-3 text-sm text-emerald-700">Attendance marked and student notification sent.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <XCircle className="mt-0.5 h-6 w-6 shrink-0 text-rose-500" />
+                      <div>
+                        <p className="font-semibold text-neutral-900">Verification failed</p>
+                        <p className="mt-1 text-sm text-rose-700">{result.message}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 flex gap-3">
+                  <button
+                    onClick={() => {
+                      setResult(null);
+                      setMode('choose');
+                    }}
+                    className="flex-1 rounded-2xl bg-neutral-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-neutral-800"
+                  >
+                    Verify another ticket
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>
