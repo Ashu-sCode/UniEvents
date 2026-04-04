@@ -43,7 +43,7 @@ export default function OrganizerEventPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Registrations filters
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unused' | 'used' | 'cancelled'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unused' | 'used' | 'cancelled' | 'waitlisted'>('all');
   const [search, setSearch] = useState('');
 
   // Cancel modal state
@@ -253,7 +253,7 @@ export default function OrganizerEventPage() {
           <StatCard label="No-shows" value={stats?.noShowCount ?? Math.max(0, event.registeredCount - attendance.length)} />
           <StatCard label="Certificates issued" value={stats?.certificateIssuedCount ?? 0} />
           <StatCard label="Certificates pending" value={stats?.certificatePendingCount ?? 0} />
-          <StatCard label="Certificate coverage" value={stats?.certificateCoverageRate ?? '0.00%'} />
+          <StatCard label="Waitlist" value={event.waitlistCount ?? 0} />
         </div>
 
         <div className="bg-white rounded-2xl border border-neutral-100 p-5 mb-8">
@@ -315,6 +315,7 @@ export default function OrganizerEventPage() {
                 >
                   <option value="all">All</option>
                   <option value="unused">Unused</option>
+                  <option value="waitlisted">Waitlisted</option>
                   <option value="used">Used</option>
                   <option value="cancelled">Cancelled</option>
                 </select>

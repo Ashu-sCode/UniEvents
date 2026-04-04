@@ -13,6 +13,7 @@ import type {
   LoginInput,
   OrganizerAnalyticsSummary,
   PaginatedResponse,
+  RegisterTicketPayload,
   RegistrationsPayload,
   SignupInput,
   Ticket,
@@ -124,7 +125,7 @@ export const eventsAPI = {
 };
 
 export const ticketsAPI = {
-  register: (eventId: string): Promise<ApiResult<{ ticket: Ticket }>> =>
+  register: (eventId: string): Promise<ApiResult<RegisterTicketPayload>> =>
     api.post(`/tickets/register/${eventId}`),
   // Backward compatible list
   getMyTickets: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<TicketsPayload>> =>

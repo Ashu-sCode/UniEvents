@@ -15,7 +15,7 @@ import {
 import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
-import { LoadingGrid, SectionLoader } from '@/components/ui';
+import { AsyncImage, LoadingGrid, SectionLoader } from '@/components/ui';
 
 const DEPARTMENT_OPTIONS = [
   'Computer Science',
@@ -27,6 +27,8 @@ const DEPARTMENT_OPTIONS = [
   'MBA',
   'Other',
 ];
+
+const STUDENT_FILTERS_STORAGE_KEY = 'unievent.student.filters';
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -62,7 +64,7 @@ export default function StudentDashboard() {
   const [eventType, setEventType] = useState<'all' | 'public' | 'departmental'>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [ticketFilter, setTicketFilter] = useState<'all' | 'unused' | 'used' | 'cancelled'>('all');
+  const [ticketFilter, setTicketFilter] = useState<'all' | 'unused' | 'used' | 'cancelled' | 'waitlisted'>('all');
   const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
   const [previewTicket, setPreviewTicket] = useState<TicketType | null>(null);
   const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
@@ -74,8 +76,35 @@ export default function StudentDashboard() {
     const params = new URLSearchParams(window.location.search);
     const ep = parseInt(params.get('eventsPage') || '1', 10);
     const tp = parseInt(params.get('ticketsPage') || '1', 10);
+    const tab = params.get('tab');
     if (!isNaN(ep) && ep > 0) setEventsPage(ep);
     if (!isNaN(tp) && tp > 0) setTicketsPage(tp);
+    if (tab === 'events' || tab === 'tickets' || tab === 'certificates') {
+      setActiveTab(tab);
+    }
+
+    try {
+      const storedFilters = window.localStorage.getItem(STUDENT_FILTERS_STORAGE_KEY);
+      if (storedFilters) {
+        const parsed = JSON.parse(storedFilters) as {
+          eventSearchInput?: string;
+          eventDepartment?: string;
+          eventType?: 'all' | 'public' | 'departmental';
+          dateFrom?: string;
+          dateTo?: string;
+          ticketFilter?: 'all' | 'unused' | 'used' | 'cancelled' | 'waitlisted';
+        };
+
+        setEventSearchInput(parsed.eventSearchInput || '');
+        setEventDepartment(parsed.eventDepartment || '');
+        setEventType(parsed.eventType || 'all');
+        setDateFrom(parsed.dateFrom || '');
+        setDateTo(parsed.dateTo || '');
+        setTicketFilter(parsed.ticketFilter || 'all');
+      }
+    } catch {
+      // Ignore corrupted local state and fall back to defaults.
+    }
   }, []);
 
   // Debounce event search input
@@ -89,8 +118,23 @@ export default function StudentDashboard() {
     const url = new URL(window.location.href);
     url.searchParams.set('eventsPage', String(eventsPage));
     url.searchParams.set('ticketsPage', String(ticketsPage));
+    url.searchParams.set('tab', activeTab);
     window.history.replaceState(null, '', url.toString());
-  }, [eventsPage, ticketsPage]);
+  }, [activeTab, eventsPage, ticketsPage]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      STUDENT_FILTERS_STORAGE_KEY,
+      JSON.stringify({
+        eventSearchInput,
+        eventDepartment,
+        eventType,
+        dateFrom,
+        dateTo,
+        ticketFilter,
+      })
+    );
+  }, [dateFrom, dateTo, eventDepartment, eventSearchInput, eventType, ticketFilter]);
 
   const fetchEvents = async () => {
     const params: any = {
@@ -130,7 +174,11 @@ export default function StudentDashboard() {
   const fetchTicketsPage = async () => {
     try {
       setIsTicketsLoading(true);
-      const ticketsRes = await ticketsAPI.getAll({ page: ticketsPage, limit: TICKETS_LIMIT });
+      const params: Record<string, string | number> = { page: ticketsPage, limit: TICKETS_LIMIT };
+      if (ticketFilter !== 'all') {
+        params.status = ticketFilter;
+      }
+      const ticketsRes = await ticketsAPI.getAll(params);
       setTicketsPageItems(ticketsRes.data.data.tickets);
       setTicketsTotal(ticketsRes.data.total || 0);
       setTicketsTotalPages(ticketsRes.data.totalPages || 1);
@@ -179,23 +227,27 @@ export default function StudentDashboard() {
     }
     fetchTicketsPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketsPage]);
+  }, [ticketFilter, ticketsPage]);
 
   const handleRegister = async (eventId: string) => {
     setRegisteringEventId(eventId);
 
     await api.run(() => ticketsAPI.register(eventId), {
-      successMessage: 'Successfully registered for the event',
+      successMessage: (response) =>
+        response.data.data.registrationType === 'waitlist'
+          ? 'Added to the waitlist'
+          : 'Successfully registered for the event',
       errorMessage: (err) => err?.response?.data?.message || 'Registration failed',
       onSuccess: (response) => {
-        const newTicket = response.data.data.ticket;
+        const { ticket: newTicket, registrationType, waitlistPosition } = response.data.data;
+        const shouldCountConfirmed = registrationType === 'confirmed';
         const nextTotal = ticketsTotal + 1;
 
         setTicketsAll((prev) => [newTicket, ...prev]);
         setTicketsTotal(nextTotal);
         setTicketsTotalPages(Math.max(1, Math.ceil(nextTotal / TICKETS_LIMIT)));
 
-        if (ticketsPage === 1) {
+        if (ticketsPage === 1 && (ticketFilter === 'all' || ticketFilter === newTicket.status)) {
           setTicketsPageItems((prev) => [newTicket, ...prev].slice(0, TICKETS_LIMIT));
         }
 
@@ -204,12 +256,17 @@ export default function StudentDashboard() {
             event._id === eventId
               ? {
                   ...event,
-                  registeredCount: event.registeredCount + 1,
-                  seatsAvailable: Math.max(0, event.seatsAvailable - 1),
+                  registeredCount: shouldCountConfirmed ? event.registeredCount + 1 : event.registeredCount,
+                  waitlistCount: shouldCountConfirmed ? event.waitlistCount ?? 0 : (event.waitlistCount ?? 0) + 1,
+                  seatsAvailable: shouldCountConfirmed ? Math.max(0, event.seatsAvailable - 1) : event.seatsAvailable,
                 }
               : event
           )
         );
+
+        if (registrationType === 'waitlist') {
+          toast.info(`Added to waitlist${waitlistPosition ? ` at position #${waitlistPosition}` : ''}.`);
+        }
       },
     });
 
@@ -243,18 +300,13 @@ export default function StudentDashboard() {
         typeof t.eventId === 'string'
           ? t.eventId
           : t.eventId?._id;
-
-      return !!eId && eId === eventId;
+      return !!eId && eId === eventId && t.status !== 'cancelled';
     });
   };
 
   const sortedAndFilteredTickets = useMemo(() => {
-    const filtered = ticketFilter === 'all'
-      ? ticketsPageItems
-      : ticketsPageItems.filter(t => t.status === ticketFilter);
-
     // Stable sort: keep original index as final tie-breaker
-    const withIndex = filtered.map((t, idx) => ({ t, idx }));
+    const withIndex = ticketsPageItems.map((t, idx) => ({ t, idx }));
 
     const getEventDateMs = (ticket: TicketType): number => {
       const event = typeof ticket.eventId === 'object' ? ticket.eventId : null;
@@ -271,7 +323,19 @@ export default function StudentDashboard() {
     });
 
     return withIndex.map(x => x.t);
-  }, [ticketsPageItems, ticketFilter]);
+  }, [ticketsPageItems]);
+
+  const hasActiveEventFilters = Boolean(eventSearch || eventDepartment || eventType !== 'all' || dateFrom || dateTo);
+
+  const clearEventFilters = () => {
+    setEventsPage(1);
+    setEventSearchInput('');
+    setEventSearch('');
+    setEventDepartment('');
+    setEventType('all');
+    setDateFrom('');
+    setDateTo('');
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -457,6 +521,17 @@ export default function StudentDashboard() {
                   />
                 </div>
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+                <span>Filters are saved on this device.</span>
+                {hasActiveEventFilters && (
+                  <button
+                    onClick={clearEventFilters}
+                    className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-neutral-700 hover:bg-neutral-100"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
             </div>
 
             {events.map((event) => (
@@ -469,9 +544,24 @@ export default function StudentDashboard() {
               />
             ))}
             {events.length === 0 && (
-              <p className="text-neutral-500 col-span-3 text-center py-16">
-                No events found.
-              </p>
+              <div className="col-span-3 rounded-2xl border border-neutral-100 bg-white p-12 text-center">
+                <p className="text-neutral-700 font-medium">
+                  {hasActiveEventFilters ? 'No events match your saved filters.' : 'No events found right now.'}
+                </p>
+                <p className="mt-2 text-sm text-neutral-500">
+                  {hasActiveEventFilters
+                    ? 'Try clearing a filter or widening your date range.'
+                    : 'Check back soon for newly published events.'}
+                </p>
+                {hasActiveEventFilters && (
+                  <button
+                    onClick={clearEventFilters}
+                    className="mt-4 rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800"
+                  >
+                    Reset filters
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Pagination */}
@@ -515,12 +605,16 @@ export default function StudentDashboard() {
               {([
                 { key: 'all', label: 'All' },
                 { key: 'unused', label: 'Unused' },
+                { key: 'waitlisted', label: 'Waitlisted' },
                 { key: 'used', label: 'Used' },
                 { key: 'cancelled', label: 'Cancelled' },
               ] as const).map(({ key, label }) => (
                 <button
                   key={key}
-                  onClick={() => setTicketFilter(key)}
+                  onClick={() => {
+                    setTicketsPage(1);
+                    setTicketFilter(key);
+                  }}
                   className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
                     ticketFilter === key
                       ? 'bg-neutral-900 text-white border-neutral-900'
@@ -558,7 +652,10 @@ export default function StudentDashboard() {
                 </div>
               ) : sortedAndFilteredTickets.length === 0 ? (
                 <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
-                  <p className="text-neutral-600">No tickets match this filter.</p>
+                  <p className="text-neutral-600">No tickets match this filter right now.</p>
+                  <p className="mt-2 text-sm text-neutral-500">
+                    Saved ticket filters stay active until you change them.
+                  </p>
                   <button
                     onClick={() => setTicketFilter('all')}
                     className="mt-4 px-4 py-2 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all"
@@ -690,16 +787,22 @@ function StatCard({ icon, label, value, onClick, isActive }: any) {
 
 function EventCard({ event, isRegistered, isRegistering, onRegister }: any) {
   const bannerUrl = getImageUrl(event.bannerUrl);
+  const waitlistCount = event.waitlistCount ?? 0;
   
   return (
     <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all">
       {/* Event Banner Image */}
       <div className="h-40 w-full overflow-hidden">
         {bannerUrl ? (
-          <img 
-            src={bannerUrl} 
+          <AsyncImage
+            src={bannerUrl}
             alt={event.title}
             className="w-full h-full object-cover"
+            fallback={
+              <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
+                <Calendar className="h-12 w-12 text-neutral-400" />
+              </div>
+            }
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
@@ -729,11 +832,17 @@ function EventCard({ event, isRegistered, isRegistering, onRegister }: any) {
             <Users className="h-4 w-4 text-neutral-400" />
             {event.seatsAvailable} seats available
           </div>
+          {event.waitlistEnabled && waitlistCount > 0 && (
+            <div className="flex items-center gap-2 text-amber-600">
+              <Users className="h-4 w-4 text-amber-500" />
+              {waitlistCount} on waitlist
+            </div>
+          )}
         </div>
 
         {isRegistered ? (
           <button disabled className="w-full py-2.5 rounded-xl font-medium bg-neutral-100 text-neutral-700">
-            ✓ Registered
+            Already Joined
           </button>
         ) : event.seatsAvailable > 0 ? (
           <button
@@ -742,6 +851,14 @@ function EventCard({ event, isRegistered, isRegistering, onRegister }: any) {
             className="w-full py-2.5 rounded-xl font-medium bg-neutral-900 text-white hover:bg-neutral-800 transition-colors disabled:opacity-50"
           >
             {isRegistering ? 'Registering…' : 'Register Now'}
+          </button>
+        ) : event.waitlistEnabled ? (
+          <button
+            onClick={onRegister}
+            disabled={isRegistering}
+            className="w-full py-2.5 rounded-xl font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+          >
+            {isRegistering ? 'Joining waitlist...' : 'Join Waitlist'}
           </button>
         ) : (
           <button disabled className="w-full py-2.5 rounded-xl font-medium bg-neutral-100 text-neutral-400">
@@ -763,11 +880,17 @@ function TicketCard({ ticket, onView, onDownload }: any) {
       {/* Event Banner */}
       <div className="h-32 w-full overflow-hidden relative">
         {bannerUrl ? (
-          <img
+          <AsyncImage
             src={bannerUrl}
             alt={event?.title || 'Event banner'}
             loading="lazy"
             className="w-full h-full object-cover"
+            fallback={
+              <div className="w-full h-full bg-neutral-100 flex flex-col items-center justify-center text-center px-4">
+                <Ticket className="h-10 w-10 text-neutral-400" />
+                <p className="mt-2 text-xs text-neutral-500">No banner available</p>
+              </div>
+            }
           />
         ) : (
           <div className="w-full h-full bg-neutral-100 flex flex-col items-center justify-center text-center px-4">
@@ -810,6 +933,12 @@ function TicketCard({ ticket, onView, onDownload }: any) {
         <p className="text-xs font-mono text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-lg mb-4 text-center">
           {ticket.ticketId}
         </p>
+
+        {ticket.status === 'waitlisted' && (
+          <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            This ticket is on the waitlist and will be promoted automatically if a seat opens.
+          </p>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-2">

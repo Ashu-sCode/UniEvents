@@ -17,6 +17,9 @@ import type { Event, EventStatus, EventType, OrganizerAnalyticsSummary } from '@
 import CameraScan from '@/components/CameraScan';
 import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { AsyncImage, Button } from '@/components/ui';
+
+const ORGANIZER_FILTERS_STORAGE_KEY = 'unievent.organizer.filters';
 
 export default function OrganizerDashboard() {
   const router = useRouter();
@@ -71,8 +74,26 @@ export default function OrganizerDashboard() {
     });
 
   useEffect(() => {
+    try {
+      const storedFilters = window.localStorage.getItem(ORGANIZER_FILTERS_STORAGE_KEY);
+      if (storedFilters) {
+        const parsed = JSON.parse(storedFilters) as { statusFilter?: string; sortBy?: string };
+        setStatusFilter(parsed.statusFilter || 'all');
+        setSortBy(parsed.sortBy || 'newest');
+      }
+    } catch {
+      // Ignore malformed local preferences.
+    }
+
     loadDashboard();
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      ORGANIZER_FILTERS_STORAGE_KEY,
+      JSON.stringify({ statusFilter, sortBy })
+    );
+  }, [sortBy, statusFilter]);
 
   const loadDashboard = async () => {
     try {
@@ -109,9 +130,10 @@ export default function OrganizerDashboard() {
         await loadDashboard();
       },
     });
-
     setIsDeletingEvent(false);
   };
+
+  const hasActiveOrganizerFilters = statusFilter !== 'all' || sortBy !== 'newest';
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -304,6 +326,21 @@ export default function OrganizerDashboard() {
           </div>
         </div>
 
+        <div className="mb-6 flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+          <span>Filters are saved on this device.</span>
+          {hasActiveOrganizerFilters && (
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                setSortBy('newest');
+              }}
+              className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-neutral-700 hover:bg-neutral-100"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
         {/* Events Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -338,7 +375,8 @@ export default function OrganizerDashboard() {
             ))}
             {filteredEvents.length === 0 && events.length > 0 && (
               <div className="col-span-full bg-white rounded-2xl border border-neutral-100 p-12 text-center">
-                <p className="text-neutral-500">No events match your filter.</p>
+                <p className="text-neutral-700 font-medium">No events match your saved filters.</p>
+                <p className="mt-2 text-sm text-neutral-500">Try clearing the status or sort preference to see more events.</p>
                 <button
                   onClick={() => setStatusFilter('all')}
                   className="mt-4 px-4 py-2 bg-neutral-100 text-neutral-700 rounded-xl font-medium hover:bg-neutral-200 transition-all"
@@ -545,10 +583,15 @@ function EventCard({ event, onScan, onEdit, onDelete, onView, isDeleting, onSetS
       {/* Event Banner */}
       <div className="h-36 w-full overflow-hidden relative">
         {bannerUrl ? (
-          <img 
-            src={bannerUrl} 
+          <AsyncImage
+            src={bannerUrl}
             alt={event.title}
             className="w-full h-full object-cover"
+            fallback={
+              <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
+                <Calendar className="h-10 w-10 text-neutral-400" />
+              </div>
+            }
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
@@ -579,6 +622,12 @@ function EventCard({ event, onScan, onEdit, onDelete, onView, isDeleting, onSetS
             <Users className="h-3.5 w-3.5 text-neutral-400" />
             <strong>{event.registeredCount}</strong> / {event.seatLimit} registered
           </p>
+          {event.waitlistEnabled && (event.waitlistCount ?? 0) > 0 && (
+            <p className="flex items-center gap-2 text-amber-600">
+              <Users className="h-3.5 w-3.5 text-amber-500" />
+              {event.waitlistCount} waiting
+            </p>
+          )}
         </div>
 
         {/* Tags */}
@@ -674,6 +723,7 @@ function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCrea
     time: string;
     venue: string;
     enableCertificates: boolean;
+    waitlistEnabled: boolean;
   }>({
     title: '',
     description: '',
@@ -684,6 +734,7 @@ function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCrea
     time: '',
     venue: '',
     enableCertificates: false,
+    waitlistEnabled: true,
   });
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -891,10 +942,15 @@ function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCrea
               <label className="label">Event Banner (Optional)</label>
               {bannerPreview ? (
                 <div className="relative rounded-xl overflow-hidden border border-neutral-200">
-                  <img 
-                    src={bannerPreview} 
-                    alt="Banner preview" 
+                  <AsyncImage
+                    src={bannerPreview}
+                    alt="Banner preview"
                     className="w-full h-40 object-cover"
+                    fallback={
+                      <div className="flex h-40 items-center justify-center bg-neutral-100 text-sm text-neutral-500">
+                        Banner preview unavailable
+                      </div>
+                    }
                   />
                   <button
                     type="button"
@@ -936,13 +992,25 @@ function CreateEventModal({ onClose, onSuccess, onOptimisticCreate, onCommitCrea
               </label>
             </div>
 
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="waitlistEnabled"
+                checked={formData.waitlistEnabled}
+                onChange={(e) => setFormData({ ...formData, waitlistEnabled: e.target.checked })}
+              />
+              <label htmlFor="waitlistEnabled" className="text-sm text-gray-700">
+                Enable waitlist when seats are full
+              </label>
+            </div>
+
             <div className="flex gap-3 pt-4">
               <button type="button" onClick={onClose} className="btn-secondary flex-1">
                 Cancel
               </button>
-              <button type="submit" disabled={isLoading} className="btn-primary flex-1">
-                {isLoading ? 'Creating...' : 'Create Event'}
-              </button>
+              <Button type="submit" isLoading={isLoading} disabled={isLoading} className="flex-1">
+                Create Event
+              </Button>
             </div>
           </form>
         </div>

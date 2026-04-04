@@ -6,6 +6,7 @@ import { getImageUrl, isValidImageType } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
 import type { Event } from '@/types';
 import { eventsAPI } from '@/lib/api';
+import { AsyncImage, Button, ModalPreviewLoader } from '@/components/ui';
 
 const DEPARTMENT_OPTIONS = [
   'Computer Science',
@@ -36,6 +37,7 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
     time: '',
     venue: '',
     enableCertificates: false,
+    waitlistEnabled: true,
   });
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -61,6 +63,7 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
         time: e.time || '',
         venue: e.venue || '',
         enableCertificates: e.enableCertificates || false,
+        waitlistEnabled: e.waitlistEnabled ?? true,
       });
 
       setBannerFile(null);
@@ -280,11 +283,25 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
               <label className="label">Event Banner</label>
               {bannerPreview ? (
                 <div className="relative rounded-xl overflow-hidden border border-neutral-200">
-                  <img 
-                    src={bannerPreview} 
-                    alt="Banner preview" 
-                    className="w-full h-40 object-cover"
-                  />
+                  {isFetching ? (
+                    <div className="flex h-40 items-center justify-center bg-neutral-100">
+                      <ModalPreviewLoader
+                        title="Preparing banner"
+                        message="Loading the current event image."
+                      />
+                    </div>
+                  ) : (
+                    <AsyncImage
+                      src={bannerPreview}
+                      alt="Banner preview"
+                      className="w-full h-40 object-cover"
+                      fallback={
+                        <div className="flex h-40 items-center justify-center bg-neutral-100 text-sm text-neutral-500">
+                          Banner preview unavailable
+                        </div>
+                      }
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={removeBanner}
@@ -329,6 +346,19 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
               </label>
             </div>
 
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="waitlistEnabled"
+                checked={formData.waitlistEnabled}
+                onChange={(e) => setFormData({ ...formData, waitlistEnabled: e.target.checked })}
+                disabled={isLoading || isFetching}
+              />
+              <label htmlFor="waitlistEnabled" className="text-sm text-gray-700">
+                Enable waitlist when seats are full
+              </label>
+            </div>
+
             {/* Buttons */}
             <div className="flex gap-3 pt-4">
               <button
@@ -339,23 +369,9 @@ export function EditEventModal({ event, onClose, onSuccess }: EditEventModalProp
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={isLoading || isFetching}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </button>
+              <Button type="submit" isLoading={isLoading} disabled={isLoading || isFetching} className="flex-1">
+                Save Changes
+              </Button>
             </div>
           </form>
         </div>

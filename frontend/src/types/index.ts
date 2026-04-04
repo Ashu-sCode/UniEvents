@@ -39,14 +39,17 @@ export interface Event {
   department: string;
   seatLimit: number;
   registeredCount: number;
+  waitlistCount?: number;
   date: string;
   time: string;
   venue: string;
   status: EventStatus;
   bannerUrl?: string;
   enableCertificates: boolean;
+  waitlistEnabled?: boolean;
   seatsAvailable: number;
   isRegistrationOpen: boolean;
+  isWaitlistOpen?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,10 +64,11 @@ export interface EventFormInput {
   time: string;
   venue: string;
   enableCertificates: boolean;
+  waitlistEnabled?: boolean;
 }
 
 // Ticket types
-export type TicketStatus = 'unused' | 'used' | 'cancelled';
+export type TicketStatus = 'unused' | 'used' | 'cancelled' | 'waitlisted';
 
 export interface Ticket {
   _id: string;
@@ -74,6 +78,8 @@ export interface Ticket {
   qrCode: string;
   status: TicketStatus;
   usedAt?: string;
+  waitlistedAt?: string;
+  promotedAt?: string;
   createdAt: string;
 }
 
@@ -191,6 +197,12 @@ export interface EventsPayload {
 
 export interface TicketsPayload {
   tickets: Ticket[];
+}
+
+export interface RegisterTicketPayload {
+  ticket: Ticket;
+  registrationType: 'confirmed' | 'waitlist';
+  waitlistPosition?: number | null;
 }
 
 export interface CertificatesPayload {
