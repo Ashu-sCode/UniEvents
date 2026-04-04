@@ -11,6 +11,7 @@ import type {
   EventFormInput,
   EventsPayload,
   LoginInput,
+  OrganizerAnalyticsSummary,
   PaginatedResponse,
   RegistrationsPayload,
   SignupInput,
@@ -150,6 +151,8 @@ export const attendanceAPI = {
     api.get(`/attendance/event/${eventId}`),
   getEventStats: (eventId: string): Promise<ApiResult<{ stats: AttendanceStats }>> =>
     api.get(`/attendance/event/${eventId}/stats`),
+  getOrganizerSummary: (): Promise<ApiResult<{ summary: OrganizerAnalyticsSummary }>> =>
+    api.get('/attendance/organizer/summary'),
 };
 
 export const certificatesAPI = {

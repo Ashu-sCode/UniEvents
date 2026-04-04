@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Download, Loader2 } from 'lucide-react';
+import { X, Download } from 'lucide-react';
 import { certificatesAPI } from '@/lib/api';
+import { ModalPreviewLoader } from '@/components/ui';
 
 const certificatePreviewCache = new Map<string, string>();
 
@@ -85,10 +86,10 @@ export default function CertificatePreviewModal({
         {/* PDF Preview */}
         <div className="flex-1 bg-neutral-100 overflow-hidden flex items-center justify-center">
           {isLoading ? (
-            <div className="flex flex-col items-center gap-3 text-neutral-500">
-              <Loader2 className="w-8 h-8 animate-spin" />
-              <p>Loading certificate...</p>
-            </div>
+            <ModalPreviewLoader
+              title="Preparing certificate preview"
+              message="Fetching your certificate PDF."
+            />
           ) : error ? (
             <div className="flex flex-col items-center gap-3 text-neutral-500 p-8 text-center">
               <p className="text-red-500">{error}</p>

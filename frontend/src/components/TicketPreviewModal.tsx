@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Download, Loader2, Ticket } from 'lucide-react';
+import { X, Download, Ticket } from 'lucide-react';
 import { ticketsAPI } from '@/lib/api';
+import { ModalPreviewLoader } from '@/components/ui';
 
 const ticketPreviewCache = new Map<string, string>();
 
@@ -90,10 +91,10 @@ export default function TicketPreviewModal({
         {/* PDF Preview */}
         <div className="flex-1 bg-neutral-100 overflow-hidden flex items-center justify-center">
           {isLoading ? (
-            <div className="flex flex-col items-center gap-3 text-neutral-500">
-              <Loader2 className="w-8 h-8 animate-spin" />
-              <p>Loading ticket...</p>
-            </div>
+            <ModalPreviewLoader
+              title="Preparing ticket preview"
+              message="Fetching your ticket PDF."
+            />
           ) : error ? (
             <div className="flex flex-col items-center gap-3 text-neutral-500 p-8 text-center">
               <p className="text-red-500">{error}</p>

@@ -92,6 +92,40 @@ export interface AttendanceStats {
   totalAttended: number;
   attendanceRate: string;
   seatsAvailable: number;
+  noShowCount: number;
+  certificateIssuedCount: number;
+  certificatePendingCount: number;
+  certificateCoverageRate: string;
+  performanceSummary: string;
+}
+
+export interface OrganizerEventSummary {
+  eventId: string;
+  title: string;
+  status: EventStatus;
+  date: string;
+  department: string;
+  eventType: EventType;
+  registeredCount: number;
+  attendedCount: number;
+  noShowCount: number;
+  attendanceRate: string;
+  certificateIssuedCount: number;
+  enableCertificates: boolean;
+}
+
+export interface OrganizerAnalyticsSummary {
+  totalEvents: number;
+  totalRegistrations: number;
+  totalAttendance: number;
+  totalNoShows: number;
+  overallAttendanceRate: string;
+  certificatesIssued: number;
+  certificateCoverageRate: string;
+  performanceSummary: string;
+  eventSummaries: OrganizerEventSummary[];
+  topPerformer: OrganizerEventSummary | null;
+  needsAttention: OrganizerEventSummary | null;
 }
 
 // Certificate types

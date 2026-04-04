@@ -1,15 +1,10 @@
 import { Suspense } from 'react';
 import SignupClient from './SignupClient';
+import { PageLoader } from '@/components/ui';
 
 export default function SignupPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-neutral-50 flex items-center justify-center px-4">
-          <div className="text-sm text-neutral-600">Loading…</div>
-        </div>
-      }
-    >
+    <Suspense fallback={<PageLoader title="Loading signup" message="Preparing the registration form." />}>
       <SignupClient />
     </Suspense>
   );

@@ -13,7 +13,7 @@ import {
   BarChart3, Eye, Camera, Keyboard, Award, Upload, X,
   Filter, ArrowUpDown, Trash2, Pencil, ChevronDown, MapPin, UserCircle
 } from 'lucide-react';
-import type { Event, EventStatus, EventType } from '@/types';
+import type { Event, EventStatus, EventType, OrganizerAnalyticsSummary } from '@/types';
 import CameraScan from '@/components/CameraScan';
 import { EditEventModal } from '@/components/EditEventModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -24,6 +24,20 @@ export default function OrganizerDashboard() {
   const toast = useToast();
   const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
+  const showAnalytics = false;
+  const summary: OrganizerAnalyticsSummary = {
+    totalEvents: 0,
+    totalRegistrations: 0,
+    totalAttendance: 0,
+    totalNoShows: 0,
+    overallAttendanceRate: '0%',
+    certificatesIssued: 0,
+    certificateCoverageRate: '0%',
+    performanceSummary: '',
+    eventSummaries: [],
+    topPerformer: null,
+    needsAttention: null,
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
@@ -57,15 +71,16 @@ export default function OrganizerDashboard() {
     });
 
   useEffect(() => {
-    fetchEvents();
+    loadDashboard();
   }, []);
 
-  const fetchEvents = async () => {
+  const loadDashboard = async () => {
     try {
-      const response = await eventsAPI.getAll();
-      setEvents(response.data.data.events);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to load events');
+      const eventsResponse = await eventsAPI.getAll();
+      setEvents(eventsResponse.data.data.events);
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      toast.error(apiError.response?.data?.message || 'Failed to load organizer dashboard');
     } finally {
       setIsLoading(false);
     }
@@ -89,8 +104,9 @@ export default function OrganizerDashboard() {
       },
       successMessage: 'Event deleted successfully',
       errorMessage: (err) => err?.response?.data?.message || 'Failed to delete event',
-      onSuccess: () => {
+      onSuccess: async () => {
         setDeleteCandidate(null);
+        await loadDashboard();
       },
     });
 
@@ -159,16 +175,92 @@ export default function OrganizerDashboard() {
           />
         </div>
 
+        {showAnalytics && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10">
+            <div className="lg:col-span-3 bg-white rounded-2xl border border-neutral-100 p-6">
+              <p className="text-sm text-neutral-500">Overall performance</p>
+              <h2 className="mt-2 text-xl font-semibold text-neutral-900">
+                {summary.performanceSummary}
+              </h2>
+              <p className="mt-2 text-sm text-neutral-600">
+                Attendance coverage <strong className="text-neutral-900">{summary.overallAttendanceRate}</strong>
+                {' '}â€¢ Certificate coverage <strong className="text-neutral-900">{summary.certificateCoverageRate}</strong>
+              </p>
+            </div>
+
+            <SummaryCard
+              title="Top Performer"
+              summary={summary.topPerformer}
+              fallback="No event performance data yet."
+            />
+            <SummaryCard
+              title="Needs Attention"
+              summary={summary.needsAttention}
+              fallback="No low-performing event detected."
+            />
+            <div className="bg-white rounded-2xl border border-neutral-100 p-6">
+              <p className="text-sm text-neutral-500">Cross-event snapshot</p>
+              <div className="mt-4 space-y-3 text-sm text-neutral-700">
+                <p>Total registrations: <strong className="text-neutral-900">{summary.totalRegistrations}</strong></p>
+                <p>Total attendance: <strong className="text-neutral-900">{summary.totalAttendance}</strong></p>
+                <p>Total no-shows: <strong className="text-neutral-900">{summary.totalNoShows}</strong></p>
+                <p>Certificates issued: <strong className="text-neutral-900">{summary.certificatesIssued}</strong></p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showAnalytics && summary.eventSummaries.length > 0 && (
+          <div className="bg-white rounded-2xl border border-neutral-100 p-6 mb-10">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <h2 className="text-lg font-semibold text-neutral-900">Event Performance</h2>
+              <span className="text-sm text-neutral-500">{summary.eventSummaries.length} tracked events</span>
+            </div>
+            <div className="space-y-3">
+              {summary.eventSummaries.slice(0, 5).map((item) => (
+                <div key={item.eventId} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-neutral-100 rounded-2xl p-4">
+                  <div>
+                    <p className="font-medium text-neutral-900">{item.title}</p>
+                    <p className="text-sm text-neutral-500">
+                      {item.department} â€¢ {item.eventType} â€¢ {formatDate(item.date)}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <MetricPill label="Registered" value={item.registeredCount} />
+                    <MetricPill label="Attended" value={item.attendedCount} />
+                    <MetricPill label="No-shows" value={item.noShowCount} />
+                    <MetricPill label="Attendance" value={item.attendanceRate} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Header & Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h2 className="text-xl font-semibold text-neutral-900">My Events</h2>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="w-full sm:w-auto px-4 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Create Event
-          </button>
+          <div>
+            <h2 className="text-xl font-semibold text-neutral-900">My Events</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Manage publishing, ticket scanning, and event updates from one place.
+            </p>
+          </div>
+          <div className="flex w-full sm:w-auto gap-3">
+            <button
+              onClick={() => router.push('/dashboard/organizer/analytics')}
+              className="w-full sm:w-auto px-4 py-2.5 bg-white text-neutral-900 border border-neutral-200 rounded-xl font-medium hover:bg-neutral-50 transition-all flex items-center justify-center gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              View Analytics
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="w-full sm:w-auto px-4 py-2.5 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Create Event
+            </button>
+          </div>
         </div>
 
         {/* Filter & Sort Controls */}
@@ -284,8 +376,9 @@ export default function OrganizerDashboard() {
           onRollbackCreate={(tempId: string) => {
             setEvents((prev) => prev.filter((e) => e._id !== tempId));
           }}
-          onSuccess={() => {
+          onSuccess={async () => {
             setShowCreateModal(false);
+            await loadDashboard();
           }}
         />
       )}
@@ -305,7 +398,7 @@ export default function OrganizerDashboard() {
           onClose={() => setShowEditModal(false)}
           onSuccess={() => {
             setShowEditModal(false);
-            fetchEvents();
+            loadDashboard();
           }}
         />
       )}
@@ -339,6 +432,47 @@ function StatCard({ icon, label, value }: any) {
         <p className="text-2xl font-semibold text-neutral-900">{value}</p>
         <p className="text-sm text-neutral-600">{label}</p>
       </div>
+    </div>
+  );
+}
+
+function MetricPill({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-neutral-50 rounded-xl px-3 py-2">
+      <p className="text-xs text-neutral-500">{label}</p>
+      <p className="text-sm font-semibold text-neutral-900">{value}</p>
+    </div>
+  );
+}
+
+function SummaryCard({
+  title,
+  summary,
+  fallback,
+}: {
+  title: string;
+  summary: OrganizerAnalyticsSummary['topPerformer'];
+  fallback: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-neutral-100 p-6">
+      <p className="text-sm text-neutral-500">{title}</p>
+      {summary ? (
+        <>
+          <h3 className="mt-2 text-lg font-semibold text-neutral-900">{summary.title}</h3>
+          <p className="mt-1 text-sm text-neutral-500">
+            {summary.department} â€¢ {summary.eventType} â€¢ {formatDate(summary.date)}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <MetricPill label="Attendance" value={summary.attendanceRate} />
+            <MetricPill label="No-shows" value={summary.noShowCount} />
+            <MetricPill label="Attended" value={summary.attendedCount} />
+            <MetricPill label="Certificates" value={summary.certificateIssuedCount} />
+          </div>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-neutral-500">{fallback}</p>
+      )}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 import type { Event, Ticket as TicketType, Certificate } from '@/types';
 import CertificatePreviewModal from '@/components/CertificatePreviewModal';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
+import { LoadingGrid, SectionLoader } from '@/components/ui';
 
 const DEPARTMENT_OPTIONS = [
   'Computer Science',
@@ -37,6 +38,9 @@ export default function StudentDashboard() {
   const [ticketsPageItems, setTicketsPageItems] = useState<TicketType[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEventsLoading, setIsEventsLoading] = useState(true);
+  const [isTicketsLoading, setIsTicketsLoading] = useState(true);
+  const [isCertificatesLoading, setIsCertificatesLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'events' | 'tickets' | 'certificates'>('events');
 
   // Pagination
@@ -102,12 +106,15 @@ export default function StudentDashboard() {
     if (dateTo) params.dateTo = dateTo;
 
     try {
+      setIsEventsLoading(true);
       const eventsRes = await eventsAPI.getAll(params);
       setEvents(eventsRes.data.data.events);
       setEventsTotal(eventsRes.data.total || 0);
       setEventsTotalPages(eventsRes.data.totalPages || 1);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to load events');
+    } finally {
+      setIsEventsLoading(false);
     }
   };
 
@@ -122,21 +129,27 @@ export default function StudentDashboard() {
 
   const fetchTicketsPage = async () => {
     try {
+      setIsTicketsLoading(true);
       const ticketsRes = await ticketsAPI.getAll({ page: ticketsPage, limit: TICKETS_LIMIT });
       setTicketsPageItems(ticketsRes.data.data.tickets);
       setTicketsTotal(ticketsRes.data.total || 0);
       setTicketsTotalPages(ticketsRes.data.totalPages || 1);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to load tickets');
+    } finally {
+      setIsTicketsLoading(false);
     }
   };
 
   const fetchCertificates = async () => {
     try {
+      setIsCertificatesLoading(true);
       const certificatesRes = await certificatesAPI.getMyCertificates();
       setCertificates(certificatesRes.data.data.certificates || []);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to load certificates');
+    } finally {
+      setIsCertificatesLoading(false);
     }
   };
 
@@ -356,12 +369,17 @@ export default function StudentDashboard() {
 
         {/* Content */}
         {isLoading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </div>
+          <LoadingGrid variant="events" count={6} />
         ) : activeTab === 'events' ? (
+          isEventsLoading ? (
+            <div className="space-y-5">
+              <SectionLoader
+                title="Refreshing events"
+                message="Updating the latest event list and filters."
+              />
+              <LoadingGrid variant="events" count={6} />
+            </div>
+          ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {/* Search & filters */}
             <div className="md:col-span-2 lg:col-span-3 mb-2">
@@ -480,7 +498,17 @@ export default function StudentDashboard() {
               </div>
             )}
           </div>
+          )
         ) : activeTab === 'tickets' ? (
+          isTicketsLoading ? (
+            <div className="space-y-5">
+              <SectionLoader
+                title="Refreshing tickets"
+                message="Updating your ticket list and status changes."
+              />
+              <LoadingGrid variant="tickets" count={3} />
+            </div>
+          ) : (
           <div className="space-y-4">
             {/* Filter pills */}
             <div className="flex flex-wrap gap-2">
@@ -565,7 +593,17 @@ export default function StudentDashboard() {
               )}
             </div>
           </div>
+          )
         ) : (
+          isCertificatesLoading ? (
+            <div className="space-y-5">
+              <SectionLoader
+                title="Refreshing certificates"
+                message="Checking for your latest issued certificates."
+              />
+              <LoadingGrid variant="cards" count={3} />
+            </div>
+          ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {certificates.map((certificate) => (
               <CertificateCard
@@ -583,6 +621,7 @@ export default function StudentDashboard() {
               </div>
             )}
           </div>
+          )
         )}
       </main>
 
@@ -619,22 +658,6 @@ export default function StudentDashboard() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-// Skeleton loaders for loading states
-function CardSkeleton() {
-  return (
-    <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden animate-pulse">
-      <div className="h-40 w-full bg-neutral-200" />
-      <div className="p-5">
-        <div className="h-5 bg-neutral-200 rounded w-3/4 mb-3" />
-        <div className="h-4 bg-neutral-100 rounded w-1/2 mb-2" />
-        <div className="h-4 bg-neutral-100 rounded w-2/3 mb-2" />
-        <div className="h-4 bg-neutral-100 rounded w-1/2 mb-4" />
-        <div className="h-10 bg-neutral-200 rounded-xl w-full" />
-      </div>
     </div>
   );
 }

@@ -9,48 +9,17 @@ import { useToast } from '@/context/ToastContext';
 import { attendanceAPI, eventsAPI, ticketsAPI } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 
-import type { Attendance, Event, Ticket } from '@/types';
+import type { Attendance, AttendanceStats, Event, Ticket } from '@/types';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { LoadingGrid, PageLoader, SectionLoader } from '@/components/ui';
 
 type TabKey = 'registrations' | 'attendance';
-
-type AttendanceStats = {
-  totalRegistered: number;
-  totalAttended: number;
-  attendanceRate: string;
-  seatsAvailable: number;
-};
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-white rounded-2xl border border-neutral-100 p-5">
       <p className="text-sm text-neutral-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-neutral-900">{value}</p>
-    </div>
-  );
-}
-
-function PageSkeleton() {
-  return (
-    <div className="min-h-screen bg-neutral-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="animate-pulse">
-          <div className="h-6 w-40 bg-neutral-200 rounded mb-6" />
-          <div className="h-8 w-1/2 bg-neutral-200 rounded mb-3" />
-          <div className="h-4 w-2/3 bg-neutral-100 rounded mb-8" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-white border border-neutral-100 rounded-2xl" />
-            ))}
-          </div>
-          <div className="h-10 w-64 bg-white border border-neutral-100 rounded-2xl" />
-          <div className="mt-6 space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 bg-white border border-neutral-100 rounded-2xl" />
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -71,6 +40,7 @@ export default function OrganizerEventPage() {
   const [stats, setStats] = useState<AttendanceStats | null>(null);
 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Registrations filters
   const [statusFilter, setStatusFilter] = useState<'all' | 'unused' | 'used' | 'cancelled'>('all');
@@ -80,8 +50,12 @@ export default function OrganizerEventPage() {
   const [cancelCandidate, setCancelCandidate] = useState<Ticket | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const loadAll = async () => {
-    setIsInitialLoading(true);
+  const loadAll = async (mode: 'initial' | 'refresh' = 'initial') => {
+    if (mode === 'initial') {
+      setIsInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
 
     await api.run(
       async () => {
@@ -104,11 +78,15 @@ export default function OrganizerEventPage() {
       }
     );
 
-    setIsInitialLoading(false);
+    if (mode === 'initial') {
+      setIsInitialLoading(false);
+    } else {
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
-    loadAll();
+    loadAll('initial');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
@@ -174,7 +152,14 @@ export default function OrganizerEventPage() {
     setIsCancelling(false);
   };
 
-  if (isInitialLoading) return <PageSkeleton />;
+  if (isInitialLoading) {
+    return (
+      <PageLoader
+        title="Loading event workspace"
+        message="Preparing registrations, attendance, and performance data."
+      />
+    );
+  }
 
   if (!event) {
     return (
@@ -217,18 +202,28 @@ export default function OrganizerEventPage() {
 
             <button
               onClick={() => {
-                loadAll();
-                toast.info('Refreshing…');
+                loadAll('refresh');
+                toast.info('Refreshing...');
               }}
-              className="px-4 py-2 rounded-xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 text-sm font-medium"
+              className="px-4 py-2 rounded-xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 text-sm font-medium disabled:opacity-60"
+              disabled={isRefreshing}
             >
-              Refresh
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        {isRefreshing && (
+          <div className="mb-6">
+            <SectionLoader
+              title="Refreshing event details"
+              message="Updating registrations, attendance, and summary stats."
+            />
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border border-neutral-100 p-6 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -252,6 +247,25 @@ export default function OrganizerEventPage() {
           <StatCard label="Attended" value={stats?.totalAttended ?? attendance.length} />
           <StatCard label="Attendance rate" value={stats?.attendanceRate ?? '—'} />
           <StatCard label="Seats available" value={stats?.seatsAvailable ?? Math.max(0, event.seatLimit - event.registeredCount)} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <StatCard label="No-shows" value={stats?.noShowCount ?? Math.max(0, event.registeredCount - attendance.length)} />
+          <StatCard label="Certificates issued" value={stats?.certificateIssuedCount ?? 0} />
+          <StatCard label="Certificates pending" value={stats?.certificatePendingCount ?? 0} />
+          <StatCard label="Certificate coverage" value={stats?.certificateCoverageRate ?? '0.00%'} />
+        </div>
+
+        <div className="bg-white rounded-2xl border border-neutral-100 p-5 mb-8">
+          <p className="text-sm text-neutral-500">Performance summary</p>
+          <p className="mt-2 text-lg font-semibold text-neutral-900">
+            {stats?.performanceSummary ?? 'Performance summary unavailable'}
+          </p>
+          <p className="mt-1 text-sm text-neutral-600">
+            Attendance rate: <span className="font-medium text-neutral-900">{stats?.attendanceRate ?? 'N/A'}</span>
+            {' '}| No-shows: <span className="font-medium text-neutral-900">{stats?.noShowCount ?? 'N/A'}</span>
+            {' '}| Certificates issued: <span className="font-medium text-neutral-900">{stats?.certificateIssuedCount ?? 'N/A'}</span>
+          </p>
         </div>
 
         {/* Tabs */}
@@ -315,6 +329,11 @@ export default function OrganizerEventPage() {
                 </p>
               </div>
 
+              {isRefreshing ? (
+                <div className="p-5">
+                  <LoadingGrid variant="cards" count={4} />
+                </div>
+              ) : (
               <div className="divide-y divide-neutral-100">
                 {filteredRegistrations.map((t) => {
                   const u = typeof t.userId === 'object' ? t.userId : null;
@@ -361,6 +380,7 @@ export default function OrganizerEventPage() {
                   <div className="p-10 text-center text-neutral-500 text-sm">No registrations found.</div>
                 )}
               </div>
+              )}
             </div>
           </>
         ) : (
@@ -371,6 +391,11 @@ export default function OrganizerEventPage() {
               </p>
             </div>
 
+            {isRefreshing ? (
+              <div className="p-5">
+                <LoadingGrid variant="cards" count={4} />
+              </div>
+            ) : (
             <div className="divide-y divide-neutral-100">
               {attendance.map((a) => {
                 const u = typeof a.userId === 'object' ? a.userId : null;
@@ -393,6 +418,7 @@ export default function OrganizerEventPage() {
                 <div className="p-10 text-center text-neutral-500 text-sm">No check-ins yet.</div>
               )}
             </div>
+            )}
           </div>
         )}
       </main>
