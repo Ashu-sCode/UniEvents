@@ -12,6 +12,12 @@ const Attendance = require('../models/Attendance.model');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const fileStorageService = require('./fileStorageService');
 
+const certificateError = (message, statusCode = 500) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
 /**
  * Generate certificates for all attendees of an event
  * Called automatically when event status changes to 'completed'
@@ -185,6 +191,79 @@ const getCertificateById = async (certificateId) => {
     .populate('issuedBy', 'name');
 };
 
+const getOwnedCertificateById = async (certificateId, ownerUserId) => {
+  const certificate = await Certificate.findOne({ certificateId })
+    .populate('eventId')
+    .populate('userId', 'name rollNumber department')
+    .populate('issuedBy', 'name department');
+
+  if (!certificate) {
+    throw certificateError('Certificate not found', 404);
+  }
+
+  if (certificate.userId._id.toString() !== ownerUserId.toString()) {
+    throw certificateError('Not authorized to access this certificate', 403);
+  }
+
+  return certificate;
+};
+
+const backfillCertificatePdf = async (certificate, pdfBuffer) => {
+  const filename = `certificate-${certificate.certificateId}.pdf`;
+
+  try {
+    const { fileId } = await fileStorageService.saveBuffer({
+      bucket: 'certificates',
+      filename,
+      contentType: 'application/pdf',
+      buffer: pdfBuffer,
+      metadata: {
+        kind: 'certificate',
+        certificateId: certificate.certificateId,
+        eventId: certificate.eventId?._id?.toString(),
+        userId: certificate.userId?._id?.toString()
+      }
+    });
+
+    certificate.pdfFileId = fileId;
+    certificate.filePath = null;
+    await certificate.save();
+  } catch (storeErr) {
+    console.error('Failed to store generated certificate in GridFS:', storeErr);
+  }
+};
+
+const prepareCertificatePdf = async ({ certificateId, ownerUserId, disposition }) => {
+  const certificate = await getOwnedCertificateById(certificateId, ownerUserId);
+  const headers = {
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `${disposition}; filename=certificate-${certificate.certificateId}.pdf`
+  };
+
+  if (certificate.pdfFileId) {
+    return {
+      certificate,
+      headers,
+      stream: fileStorageService.openDownloadStream({
+        bucket: 'certificates',
+        fileId: certificate.pdfFileId
+      })
+    };
+  }
+
+  const pdfBuffer = await generateCertificatePDF(certificate);
+  await backfillCertificatePdf(certificate, pdfBuffer);
+
+  return {
+    certificate,
+    headers: {
+      ...headers,
+      'Content-Length': pdfBuffer.length
+    },
+    buffer: pdfBuffer
+  };
+};
+
 /**
  * Get all certificates for a user
  *
@@ -233,7 +312,9 @@ module.exports = {
   generateCertificatesForEvent,
   generateSingleCertificate,
   getCertificateById,
+  getOwnedCertificateById,
   getUserCertificates,
   getEventCertificates,
-  getCertificateStats
+  getCertificateStats,
+  prepareCertificatePdf
 };

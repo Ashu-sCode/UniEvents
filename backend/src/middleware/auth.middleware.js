@@ -7,6 +7,12 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User.model');
 const { jwt: jwtConfig, roles } = require('../config/auth.config');
 
+const authError = (message, statusCode = 401) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
 /**
  * Verify JWT token and attach user to request
  */
@@ -25,22 +31,41 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
 
     // Verify token
-    const decoded = jwt.verify(token, jwtConfig.secret);
+    const decoded = jwt.verify(token, jwtConfig.secret, {
+      issuer: jwtConfig.issuer
+    });
+
+    if (!decoded?.userId) {
+      return next(authError('Invalid token payload'));
+    }
 
     // Find user
     const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
+      return next(authError('Access revoked. User no longer exists.'));
+    }
+
+    if (!user.isActive) {
+      return next(authError('Account is deactivated'));
+    }
+
+    const tokenVersion = Number(decoded.tokenVersion ?? 0);
+    if (tokenVersion !== user.tokenVersion) {
+      return next(authError('Session revoked. Please log in again.'));
     }
 
     // Attach user to request
     req.user = user;
     next();
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      error.statusCode = 401;
+      error.message = 'Session expired. Please log in again.';
+    } else if (error.name === 'JsonWebTokenError') {
+      error.statusCode = 401;
+      error.message = 'Invalid authentication token.';
+    }
     next(error);
   }
 };

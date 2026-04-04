@@ -16,7 +16,7 @@ const { sendPasswordResetEmail } = require('../services/emailService');
  */
 const generateToken = (user) => {
   return jwt.sign(
-    { userId: user._id, role: user.role },
+    { userId: user._id, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
     jwtConfig.secret,
     { expiresIn: jwtConfig.expiresIn, issuer: jwtConfig.issuer }
   );

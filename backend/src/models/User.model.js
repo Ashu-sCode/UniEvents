@@ -65,6 +65,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  tokenVersion: {
+    type: Number,
+    default: 0
+  },
 
   // Password reset (hashed token only)
   resetPasswordToken: {
@@ -126,6 +130,7 @@ userSchema.methods.toPublicJSON = function() {
     phone: this.phone,
     profilePhotoUrl: this.profilePhotoUrl,
     role: this.role,
+    isActive: this.isActive,
     createdAt: this.createdAt
   };
 };
