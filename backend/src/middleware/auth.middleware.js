@@ -5,6 +5,7 @@
 
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.model');
+const { approvalStatuses } = require('../models/User.model');
 const { jwt: jwtConfig, roles } = require('../config/auth.config');
 
 const authError = (message, statusCode = 401) => {
@@ -90,6 +91,17 @@ const authorize = (...allowedRoles) => {
       });
     }
 
+    const effectiveApprovalStatus = req.user.approvalStatus || approvalStatuses.APPROVED;
+    if (req.user.role !== roles.ADMIN && effectiveApprovalStatus !== approvalStatuses.APPROVED) {
+      return res.status(403).json({
+        success: false,
+        message:
+          effectiveApprovalStatus === approvalStatuses.REJECTED
+            ? 'Account approval was rejected'
+            : 'Account is pending admin approval'
+      });
+    }
+
     next();
   };
 };
@@ -103,10 +115,12 @@ const organizerOnly = authorize(roles.ORGANIZER);
  * Middleware to allow only students
  */
 const studentOnly = authorize(roles.STUDENT);
+const adminOnly = authorize(roles.ADMIN);
 
 module.exports = {
   authenticate,
   authorize,
   organizerOnly,
-  studentOnly
+  studentOnly,
+  adminOnly
 };

@@ -6,8 +6,10 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User.model');
+const { approvalStatuses } = require('../models/User.model');
 const { jwt: jwtConfig, roles } = require('../config/auth.config');
 const { sendPasswordResetEmail } = require('../services/emailService');
+const imageService = require('../services/imageService');
 
 /**
  * Generate JWT token for user
@@ -16,7 +18,12 @@ const { sendPasswordResetEmail } = require('../services/emailService');
  */
 const generateToken = (user) => {
   return jwt.sign(
-    { userId: user._id, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
+    {
+      userId: user._id,
+      role: user.role,
+      tokenVersion: user.tokenVersion ?? 0,
+      approvalStatus: user.approvalStatus || approvalStatuses.APPROVED
+    },
     jwtConfig.secret,
     { expiresIn: jwtConfig.expiresIn, issuer: jwtConfig.issuer }
   );
@@ -30,9 +37,10 @@ const generateToken = (user) => {
 const signup = async (req, res, next) => {
   try {
     const { name, email, password, rollNumber, department, role } = req.body;
+    const normalizedEmail = String(email || '').toLowerCase().trim();
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -51,22 +59,51 @@ const signup = async (req, res, next) => {
       });
     }
 
+    if (userRole === roles.STUDENT && !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student ID card is required for approval'
+      });
+    }
+
     // Create new user
-    const user = await User.create({
+    const user = new User({
       name,
-      email,
+      email: normalizedEmail,
       password,
       rollNumber: userRole === roles.STUDENT ? rollNumber : null,
       department,
-      role: userRole
+      role: userRole,
+      approvalStatus: approvalStatuses.PENDING,
+      idCardFileId: null,
+      idCardUrl: null
     });
+
+    if (userRole === roles.STUDENT && req.file) {
+      try {
+        const idCardResult = await imageService.processIdCard(
+          req.file.buffer,
+          user._id.toString(),
+          req.file.mimetype
+        );
+        user.idCardFileId = idCardResult.fileId;
+        user.idCardUrl = '/api/users/me/id-card';
+      } catch (uploadError) {
+        return res.status(500).json({
+          success: false,
+          message: 'Unable to process student ID card. Please try again.'
+        });
+      }
+    }
+
+    await user.save();
 
     // Generate token
     const token = generateToken(user);
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message: 'Registration submitted for admin approval',
       data: {
         user: user.toPublicJSON(),
         token
@@ -127,7 +164,12 @@ const login = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: 'Login successful',
+      message:
+        user.approvalStatus === approvalStatuses.APPROVED
+          ? 'Login successful'
+          : user.approvalStatus === approvalStatuses.REJECTED
+            ? 'Account review completed'
+            : 'Account pending admin approval',
       data: {
         user: user.toPublicJSON(),
         token

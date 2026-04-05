@@ -10,6 +10,7 @@ const authController = require('../controllers/auth.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const validateRequest = require('../middleware/validateRequest');
 const { authLimiter } = require('../middleware/rateLimiters');
+const { idCardUpload, handleUploadError } = require('../middleware/uploadMiddleware');
 const { stripTags } = require('../utils/sanitize');
 
 // Validation rules
@@ -74,7 +75,15 @@ const resetPasswordValidation = [
 
 // Routes
 // Rate limit ONLY auth endpoints (do not rate-limit other APIs)
-router.post('/signup', authLimiter, signupValidation, validateRequest, authController.signup);
+router.post(
+  '/signup',
+  authLimiter,
+  idCardUpload.single('idCard'),
+  handleUploadError,
+  signupValidation,
+  validateRequest,
+  authController.signup
+);
 router.post('/login', authLimiter, loginValidation, validateRequest, authController.login);
 router.post('/forgot-password', authLimiter, forgotPasswordValidation, validateRequest, authController.forgotPassword);
 router.post('/reset-password/:token', authLimiter, resetPasswordValidation, validateRequest, authController.resetPassword);

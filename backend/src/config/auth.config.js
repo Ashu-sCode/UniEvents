@@ -13,6 +13,7 @@ module.exports = {
 
   // User Roles
   roles: {
+    ADMIN: 'admin',
     STUDENT: 'student',
     ORGANIZER: 'organizer'
   },

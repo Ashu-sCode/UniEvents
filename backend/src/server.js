@@ -12,6 +12,7 @@ if (!process.env.JWT_SECRET) {
 const app = require('./app');
 const connectDB = require('./config/database');
 const { ensureDemoData } = require('./services/demoSeedService');
+const { ensureAdminAccount } = require('./services/adminBootstrapService');
 const os = require('os');
 
 const PORT = process.env.PORT || 5000;
@@ -31,6 +32,15 @@ const getLocalIP = () => {
 
 async function startServer() {
   await connectDB();
+
+  try {
+    const adminResult = await ensureAdminAccount();
+    if (adminResult.created) {
+      console.log(`[admin-bootstrap] Admin account ready: ${adminResult.email}`);
+    }
+  } catch (adminError) {
+    console.error('[admin-bootstrap] Failed to prepare admin account:', adminError.message);
+  }
 
   if (process.env.NODE_ENV !== 'production' && process.env.AUTO_SEED_DEMO_DATA !== 'false') {
     try {

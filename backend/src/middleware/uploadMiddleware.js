@@ -50,6 +50,15 @@ const genericImageUpload = multer({
   }
 });
 
+const idCardUpload = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 1
+  }
+});
+
 /**
  * Middleware to handle multer errors
  */
@@ -112,6 +121,7 @@ const uploadBannerOptional = [
 module.exports = {
   eventBannerUpload,
   profilePhotoUpload,
+  idCardUpload,
   genericImageUpload,
   handleUploadError,
   uploadBanner,

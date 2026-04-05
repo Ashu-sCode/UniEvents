@@ -7,6 +7,12 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { roles, password: passwordConfig } = require('../config/auth.config');
 
+const approvalStatuses = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected'
+};
+
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -59,6 +65,38 @@ const userSchema = new mongoose.Schema({
   },
   idCardUrl: {
     type: String,
+    default: null
+  },
+  idCardFileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null
+  },
+  approvalStatus: {
+    type: String,
+    enum: Object.values(approvalStatuses),
+    default: approvalStatuses.APPROVED
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  approvedAt: {
+    type: Date,
+    default: null
+  },
+  rejectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  rejectedAt: {
+    type: Date,
+    default: null
+  },
+  rejectionReason: {
+    type: String,
+    trim: true,
     default: null
   },
   isActive: {
@@ -130,6 +168,9 @@ userSchema.methods.toPublicJSON = function() {
     phone: this.phone,
     profilePhotoUrl: this.profilePhotoUrl,
     role: this.role,
+    approvalStatus: this.approvalStatus || approvalStatuses.APPROVED,
+    rejectionReason: this.rejectionReason,
+    idCardUrl: this.idCardUrl,
     isActive: this.isActive,
     createdAt: this.createdAt
   };
@@ -138,3 +179,4 @@ userSchema.methods.toPublicJSON = function() {
 const User = mongoose.model('User', userSchema);
 
 module.exports = User;
+module.exports.approvalStatuses = approvalStatuses;

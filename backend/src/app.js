@@ -9,6 +9,7 @@ const certificateRoutes = require("./routes/certificate.routes");
 const fileRoutes = require("./routes/file.routes");
 const userRoutes = require("./routes/user.routes");
 const notificationRoutes = require("./routes/notification.routes");
+const adminRoutes = require("./routes/admin.routes");
 
 const errorHandler = require("./middleware/errorHandler");
 
@@ -70,6 +71,7 @@ app.use("/api/certificates", certificateRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
 
 /* =========================
    404 HANDLER

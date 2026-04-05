@@ -5,6 +5,8 @@
 
 const User = require('../models/User.model');
 const imageService = require('../services/imageService');
+const mongoose = require('mongoose');
+const fileStorageService = require('../services/fileStorageService');
 
 /**
  * @route   GET /api/users/me
@@ -93,7 +95,46 @@ const updateMe = async (req, res, next) => {
   }
 };
 
+const streamOwnIdCard = async (req, res, next) => {
+  try {
+    if (!req.user?.idCardFileId) {
+      return res.status(404).json({
+        success: false,
+        message: 'ID card not found'
+      });
+    }
+
+    const fileId =
+      typeof req.user.idCardFileId === 'string'
+        ? new mongoose.Types.ObjectId(req.user.idCardFileId)
+        : req.user.idCardFileId;
+
+    const filesCollection = mongoose.connection.db.collection('id-cards.files');
+    const fileDoc = await filesCollection.findOne({ _id: fileId });
+
+    if (!fileDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'ID card file not found'
+      });
+    }
+
+    res.set('Content-Type', fileDoc.contentType || 'application/octet-stream');
+    if (typeof fileDoc.length === 'number') {
+      res.set('Content-Length', fileDoc.length.toString());
+    }
+    res.set('Cache-Control', 'private, max-age=60');
+
+    const downloadStream = fileStorageService.openDownloadStream({ bucket: 'id-cards', fileId });
+    downloadStream.on('error', next);
+    downloadStream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getMe,
-  updateMe
+  updateMe,
+  streamOwnIdCard
 };

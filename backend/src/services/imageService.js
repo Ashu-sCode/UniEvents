@@ -26,6 +26,12 @@ const PROFILE_PHOTO_CONFIG = {
   outputFormat: 'webp'
 };
 
+const ID_CARD_CONFIG = {
+  maxWidth: 1600,
+  quality: 86,
+  outputFormat: 'webp'
+};
+
 /**
  * Process and save an event banner image to GridFS
  *
@@ -141,6 +147,51 @@ const processProfilePhoto = async (imageBuffer, userId, originalMimetype) => {
   }
 };
 
+const processIdCard = async (imageBuffer, userId, originalMimetype) => {
+  try {
+    if (!CONFIG.allowedTypes.includes(originalMimetype)) {
+      throw new Error(`Invalid file type. Allowed: ${CONFIG.allowedTypes.join(', ')}`);
+    }
+
+    const processedBuffer = await sharp(imageBuffer)
+      .resize(ID_CARD_CONFIG.maxWidth, null, {
+        withoutEnlargement: true,
+        fit: 'inside'
+      })
+      .webp({ quality: ID_CARD_CONFIG.quality })
+      .toBuffer();
+
+    const metadata = await sharp(processedBuffer).metadata();
+
+    const filename = `id-card-${userId}-${Date.now()}.webp`;
+    const { fileId } = await fileStorageService.saveBuffer({
+      bucket: 'id-cards',
+      filename,
+      contentType: 'image/webp',
+      buffer: processedBuffer,
+      metadata: {
+        kind: 'id-card',
+        userId,
+        originalMimetype,
+        width: metadata.width,
+        height: metadata.height
+      }
+    });
+
+    return {
+      success: true,
+      fileId,
+      filename,
+      width: metadata.width,
+      height: metadata.height,
+      size: processedBuffer.length
+    };
+  } catch (error) {
+    console.error('[ImageService] Error processing id card:', error);
+    throw error;
+  }
+};
+
 /**
  * Delete a profile photo from GridFS
  *
@@ -179,6 +230,21 @@ const deleteEventBannerByFileId = async (fileId) => {
     return true;
   } catch (error) {
     // GridFS delete throws if not found; treat as non-fatal for cleanup paths
+    if (error?.message?.includes('FileNotFound')) return false;
+    throw error;
+  }
+};
+
+const deleteIdCardByFileId = async (fileId) => {
+  try {
+    if (!fileId) return false;
+
+    const objectId = typeof fileId === 'string' ? new mongoose.Types.ObjectId(fileId) : fileId;
+    if (!mongoose.Types.ObjectId.isValid(objectId)) return false;
+
+    await fileStorageService.deleteFile({ bucket: 'id-cards', fileId: objectId });
+    return true;
+  } catch (error) {
     if (error?.message?.includes('FileNotFound')) return false;
     throw error;
   }
@@ -255,6 +321,8 @@ module.exports = {
   deleteEventBannerByFileId,
   processProfilePhoto,
   deleteProfilePhotoByFileId,
+  processIdCard,
+  deleteIdCardByFileId,
   validateImage,
   getImageMetadata,
   generateThumbnail,

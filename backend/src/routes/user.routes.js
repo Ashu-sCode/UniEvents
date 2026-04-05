@@ -34,6 +34,7 @@ const updateMeValidation = [
 ];
 
 router.get('/me', authenticate, userController.getMe);
+router.get('/me/id-card', authenticate, userController.streamOwnIdCard);
 
 // Supports JSON updates OR multipart/form-data when uploading a photo.
 router.put(
