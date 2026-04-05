@@ -1,3 +1,6 @@
+export type UserRole = 'student' | 'organizer' | 'admin';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 // User types
 export interface User {
   id: string;
@@ -7,7 +10,11 @@ export interface User {
   department: string;
   phone?: string | null;
   profilePhotoUrl?: string | null;
-  role: 'student' | 'organizer';
+  idCardUrl?: string | null;
+  role: UserRole;
+  approvalStatus: ApprovalStatus;
+  rejectionReason?: string | null;
+  isActive?: boolean;
   createdAt?: string;
 }
 
@@ -18,6 +25,7 @@ export interface SignupInput {
   rollNumber?: string;
   department: string;
   role: 'student' | 'organizer';
+  idCard?: File | null;
 }
 
 export interface LoginInput {
@@ -214,6 +222,37 @@ export interface AuthPayload {
 
 export interface UserPayload {
   user: User;
+}
+
+export interface AdminUserReview extends User {
+  hasIdCard: boolean;
+  approvalMetadata?: {
+    approvedAt?: string | null;
+    approvedBy?: {
+      id?: string;
+      name?: string;
+      email?: string;
+    } | null;
+    rejectedAt?: string | null;
+    rejectedBy?: {
+      id?: string;
+      name?: string;
+      email?: string;
+    } | null;
+    rejectionReason?: string | null;
+  };
+}
+
+export interface AdminSummary {
+  pendingStudents: number;
+  pendingOrganizers: number;
+  approvedUsers: number;
+  rejectedUsers: number;
+  admins: number;
+}
+
+export interface AdminUsersPayload {
+  users: AdminUserReview[];
 }
 
 export interface EventsPayload {

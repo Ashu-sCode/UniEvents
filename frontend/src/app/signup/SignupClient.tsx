@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, KeyRound, Mail, User, Users } from 'lucide-react';
+import { Eye, EyeOff, FileBadge2, KeyRound, Mail, User, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui';
@@ -21,6 +21,7 @@ export default function SignupClient() {
     rollNumber: '',
     department: '',
     role: initialRole,
+    idCard: null as File | null,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -46,8 +47,8 @@ export default function SignupClient() {
   };
 
   const roleCopy = formData.role === 'student'
-    ? 'Create a student account to browse events, keep tickets ready, and track attendance and certificates.'
-    : 'Create an organizer account to publish events, manage registrations, scan entries, and review analytics.';
+    ? 'Student access opens after admin approval. Upload your campus ID card so tickets, registrations, and certificates stay protected from fake accounts.'
+    : 'Organizer access opens after admin approval. Your request will be reviewed before event creation, scanning, and analytics tools are unlocked.';
 
   return (
     <AuthShell
@@ -118,6 +119,12 @@ export default function SignupClient() {
           <p className="mt-3 text-sm text-neutral-600">{roleCopy}</p>
         </div>
 
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
+          {formData.role === 'student'
+            ? 'Students must upload a valid campus ID card and wait for admin approval before using the dashboard.'
+            : 'Organizers must wait for admin approval before event operations and ticket verification tools become available.'}
+        </div>
+
         <div>
           <label htmlFor="name" className="label">Full Name</label>
           <input
@@ -152,19 +159,43 @@ export default function SignupClient() {
         </div>
 
         {formData.role === 'student' && (
-          <div>
-            <label htmlFor="rollNumber" className="label">Roll Number</label>
-            <input
-              id="rollNumber"
-              name="rollNumber"
-              type="text"
-              value={formData.rollNumber}
-              onChange={handleChange}
-              className="input"
-              placeholder="BCA-001 or similar"
-              required
-            />
-          </div>
+          <>
+            <div>
+              <label htmlFor="rollNumber" className="label">Roll Number</label>
+              <input
+                id="rollNumber"
+                name="rollNumber"
+                type="text"
+                value={formData.rollNumber}
+                onChange={handleChange}
+                className="input"
+                placeholder="BCA-001 or similar"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="idCard" className="label">Student ID Card</label>
+              <div className="relative">
+                <FileBadge2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+                <input
+                  id="idCard"
+                  name="idCard"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="input pl-10 file:mr-3 file:rounded-xl file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      idCard: event.target.files?.[0] || null,
+                    }))
+                  }
+                  required
+                />
+              </div>
+              <p className="mt-2 text-xs text-neutral-500">Upload a clear image of your college ID card. This is reviewed by admin before approval.</p>
+            </div>
+          </>
         )}
 
         <div>

@@ -3,8 +3,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { authAPI } from '@/lib/api';
 import type { SignupInput, User } from '@/types';
 import { useLoading } from '@/context/LoadingContext';
+import { getPostAuthRoute } from '@/lib/authState';
 
 interface AuthContextType {
   user: User | null;
@@ -43,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     showGlobalLoader();
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await authAPI.login({ email, password });
       const { user: userData, token: authToken } = response.data.data;
 
       setUser(userData);
@@ -52,12 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('user', JSON.stringify(userData));
       api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
-      // Redirect based on role
-      if (userData.role === 'organizer') {
-        router.push('/dashboard/organizer');
-      } else {
-        router.push('/dashboard/student');
-      }
+      router.push(getPostAuthRoute(userData));
     } finally {
       hideGlobalLoader();
     }
@@ -66,7 +63,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (data: SignupInput) => {
     showGlobalLoader();
     try {
-      const response = await api.post('/auth/signup', data);
+      const payload = new FormData();
+      payload.append('name', data.name);
+      payload.append('email', data.email);
+      payload.append('password', data.password);
+      payload.append('department', data.department);
+      payload.append('role', data.role);
+
+      if (data.rollNumber) {
+        payload.append('rollNumber', data.rollNumber);
+      }
+
+      if (data.idCard) {
+        payload.append('idCard', data.idCard);
+      }
+
+      const response = await authAPI.signup(payload);
       const { user: userData, token: authToken } = response.data.data;
 
       setUser(userData);
@@ -75,12 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('user', JSON.stringify(userData));
       api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
-      // Redirect based on role
-      if (userData.role === 'organizer') {
-        router.push('/dashboard/organizer');
-      } else {
-        router.push('/dashboard/student');
-      }
+      router.push(getPostAuthRoute(userData));
     } finally {
       hideGlobalLoader();
     }

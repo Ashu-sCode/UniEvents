@@ -18,6 +18,8 @@ import { DashboardNavbar } from '@/components/DashboardNavbar';
 import TicketPreviewModal from '@/components/TicketPreviewModal';
 import { AsyncImage, LoadingGrid, SectionLoader } from '@/components/ui';
 import { STREAM_OPTIONS } from '@/constants/streams';
+import { useRequireAuthRole } from '@/hooks/useRequireAuthRole';
+import { PageLoader } from '@/components/ui';
 
 const STUDENT_FILTERS_STORAGE_KEY = 'unievent.student.filters';
 const SEEN_PROMOTION_STORAGE_KEY = 'unievent.student.seenPromotions';
@@ -25,6 +27,7 @@ const SEEN_PROMOTION_STORAGE_KEY = 'unievent.student.seenPromotions';
 export default function StudentDashboard() {
   const router = useRouter();
   const { user } = useAuth();
+  const { isReady } = useRequireAuthRole('student');
   const toast = useToast();
   const api = useApi();
   const [events, setEvents] = useState<Event[]>([]);
@@ -412,6 +415,10 @@ export default function StudentDashboard() {
   const activeStudentTickets = ticketsAll.filter((ticket) => ticket.status === 'unused' || ticket.status === 'waitlisted').length;
   const attendedEventsCount = ticketsAll.filter((ticket) => ticket.status === 'used').length;
   const waitlistedTicketsCount = ticketsAll.filter((ticket) => ticket.status === 'waitlisted').length;
+
+  if (!isReady) {
+    return <PageLoader title="Preparing student dashboard" />;
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dbeafe_0%,transparent_28%),radial-gradient(circle_at_top_right,#e0f2fe_0%,transparent_26%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_45%,#f8fafc_100%)]">

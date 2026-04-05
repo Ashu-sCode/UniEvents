@@ -9,15 +9,17 @@ import {
   ChevronRight,
   Home,
   LogOut,
+  ShieldCheck,
   Ticket,
   UserCircle,
+  Users,
 } from 'lucide-react';
 
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 
-type DashboardRole = 'student' | 'organizer';
+type DashboardRole = 'student' | 'organizer' | 'admin';
 
 type DashboardNavbarProps = {
   role: DashboardRole;
@@ -42,6 +44,11 @@ const roleLinks: Record<DashboardRole, NavItem[]> = {
     { label: 'Dashboard', href: '/dashboard/organizer', icon: <Home className="h-4 w-4" /> },
     { label: 'Analytics', href: '/dashboard/organizer/analytics', icon: <BarChart3 className="h-4 w-4" /> },
     { label: 'Profile', href: '/dashboard/organizer/profile', icon: <UserCircle className="h-4 w-4" /> },
+  ],
+  admin: [
+    { label: 'Dashboard', href: '/dashboard/admin', icon: <Home className="h-4 w-4" /> },
+    { label: 'Approvals', href: '/dashboard/admin', icon: <Users className="h-4 w-4" /> },
+    { label: 'Control', href: '/dashboard/admin', icon: <ShieldCheck className="h-4 w-4" /> },
   ],
 };
 

@@ -1,5 +1,8 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import type {
+  AdminSummary,
+  AdminUserReview,
+  AdminUsersPayload,
   ApiErrorResponse,
   ApiResponse,
   Attendance,
@@ -26,7 +29,7 @@ import type {
 } from '@/types';
 
 // API URL with fallback to localhost
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // Log API URL in development
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -87,8 +90,14 @@ export default api;
 export const authAPI = {
   login: (data: LoginInput): Promise<ApiResult<AuthPayload>> =>
     api.post('/auth/login', data),
-  signup: (data: SignupInput): Promise<ApiResult<AuthPayload>> =>
-    api.post('/auth/signup', data),
+  signup: (data: SignupInput | FormData): Promise<ApiResult<AuthPayload>> => {
+    if (data instanceof FormData) {
+      return api.post('/auth/signup', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    }
+    return api.post('/auth/signup', data);
+  },
   getProfile: (): Promise<ApiResult<UserPayload>> =>
     api.get('/auth/me'),
   forgotPassword: (data: { email: string }): Promise<ApiResult<Record<string, never>>> =>
@@ -173,6 +182,8 @@ export const certificatesAPI = {
 
 export const usersAPI = {
   getMe: (): Promise<ApiResult<UserPayload>> => api.get('/users/me'),
+  getMyIdCard: (): Promise<AxiosResponse<Blob>> =>
+    api.get('/users/me/id-card', { responseType: 'blob' }),
   updateMe: (data: FormData | Partial<Pick<User, 'name' | 'phone' | 'department'>>): Promise<ApiResult<UserPayload>> => {
     if (data instanceof FormData) {
       return api.put('/users/me', data, {
@@ -181,6 +192,23 @@ export const usersAPI = {
     }
     return api.put('/users/me', data);
   },
+};
+
+export const adminAPI = {
+  getSummary: (): Promise<ApiResult<{ summary: AdminSummary }>> =>
+    api.get('/admin/summary'),
+  getUsers: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<AdminUsersPayload>> =>
+    api.get('/admin/users', { params }),
+  getUser: (userId: string): Promise<ApiResult<{ user: AdminUserReview }>> =>
+    api.get(`/admin/users/${userId}`),
+  updateUserActiveState: (userId: string, isActive: boolean): Promise<ApiResult<{ user: AdminUserReview }>> =>
+    api.patch(`/admin/users/${userId}/active-state`, { isActive }),
+  approveUser: (userId: string): Promise<ApiResult<{ user: AdminUserReview }>> =>
+    api.post(`/admin/users/${userId}/approve`),
+  rejectUser: (userId: string, reason: string): Promise<ApiResult<{ user: AdminUserReview }>> =>
+    api.post(`/admin/users/${userId}/reject`, { reason }),
+  getUserIdCard: (userId: string): Promise<AxiosResponse<Blob>> =>
+    api.get(`/admin/users/${userId}/id-card`, { responseType: 'blob' }),
 };
 
 export const notificationsAPI = {

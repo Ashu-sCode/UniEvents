@@ -12,7 +12,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import { DashboardNavbar } from '@/components/DashboardNavbar';
+import { PageLoader } from '@/components/ui';
 import { useToast } from '@/context/ToastContext';
+import { useRequireAuthRole } from '@/hooks/useRequireAuthRole';
 import { attendanceAPI } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import type { OrganizerAnalyticsSummary, OrganizerEventSummary } from '@/types';
@@ -74,6 +76,7 @@ function getAccentTheme(index: number): AccentTheme {
 }
 
 export default function OrganizerAnalyticsPage() {
+  const { isReady } = useRequireAuthRole('organizer');
   const toast = useToast();
   const [summary, setSummary] = useState<OrganizerAnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,6 +143,10 @@ export default function OrganizerAnalyticsPage() {
 
   const attendanceRate = percentToNumber(summary?.overallAttendanceRate ?? '0%');
   const certificateCoverage = percentToNumber(summary?.certificateCoverageRate ?? '0%');
+
+  if (!isReady) {
+    return <PageLoader title="Preparing analytics" />;
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#e0f2fe_0%,transparent_28%),radial-gradient(circle_at_top_right,#ede9fe_0%,transparent_30%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)]">

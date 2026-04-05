@@ -17,6 +17,7 @@ import {
 
 import { DashboardNavbar } from '@/components/DashboardNavbar';
 import { useToast } from '@/context/ToastContext';
+import { useRequireAuthRole } from '@/hooks/useRequireAuthRole';
 import { useApi } from '@/hooks/useApi';
 import { attendanceAPI, eventsAPI, ticketsAPI } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
@@ -101,6 +102,7 @@ function SurfaceCard({
 }
 
 export default function OrganizerEventPage() {
+  const { isReady } = useRequireAuthRole('organizer');
   const params = useParams();
   const eventId = String(params.eventId);
 
@@ -251,6 +253,10 @@ export default function OrganizerEventPage() {
   const attendanceRate = stats?.attendanceRate ?? 'N/A';
   const seatsAvailable = stats?.seatsAvailable ?? Math.max(0, event.seatLimit - event.registeredCount);
   const waitlistCount = event.waitlistCount ?? 0;
+
+  if (!isReady) {
+    return <PageLoader title="Preparing event workspace" />;
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dcfce7_0%,transparent_24%),radial-gradient(circle_at_top_right,#dbeafe_0%,transparent_24%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_45%,#f8fafc_100%)]">
