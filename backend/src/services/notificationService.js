@@ -238,6 +238,25 @@ const notifyCertificateReady = async ({ certificate, event, user }) => {
   });
 };
 
+const notifyUsersAnnouncement = async ({
+  userIds,
+  title,
+  message,
+  link = null,
+  metadata = {},
+}) => {
+  return createNotifications(
+    userIds.map((userId) => ({
+      userId,
+      type: Notification.NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT,
+      title,
+      message,
+      link,
+      metadata,
+    }))
+  );
+};
+
 module.exports = {
   createNotification,
   createNotifications,
@@ -248,4 +267,5 @@ module.exports = {
   notifyAttendanceMarked,
   notifyEventAudience,
   notifyCertificateReady,
+  notifyUsersAnnouncement,
 };

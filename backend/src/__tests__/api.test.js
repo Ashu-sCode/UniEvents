@@ -712,4 +712,88 @@ describe('UniEvent API integration', () => {
     expect(reactivatedLogin.user.approvalStatus).toBe('approved');
   });
 
+  test('admin can oversee events and send announcements', async () => {
+    const { token: adminToken } = await createAdmin();
+
+    const organizerSignup = await signupUser(createUserPayload({
+      name: 'Oversight Organizer',
+      email: `oversight-organizer-${Date.now()}@example.com`,
+      role: 'organizer',
+      rollNumber: undefined,
+    }));
+    const studentSignup = await signupUser(createUserPayload({
+      name: 'Oversight Student',
+      email: `oversight-student-${Date.now()}@example.com`,
+    }));
+
+    await approveUser(organizerSignup.user.id);
+    await approveUser(studentSignup.user.id);
+
+    const event = await Event.create({
+      title: 'Admin Oversight Event',
+      description: 'Event used to validate admin oversight and moderation.',
+      organizerId: organizerSignup.user.id,
+      eventType: 'public',
+      department: 'Computer Science',
+      seatLimit: 10,
+      registeredCount: 1,
+      waitlistCount: 0,
+      date: new Date('2099-06-10'),
+      time: '10:00',
+      venue: 'Main Hall',
+      status: Event.EVENT_STATUS.PUBLISHED,
+      enableCertificates: true,
+    });
+
+    await Ticket.create({
+      eventId: event._id,
+      userId: studentSignup.user.id,
+      qrCode: 'test-qr-code',
+      status: Ticket.TICKET_STATUS.UNUSED,
+    });
+
+    const listRes = await request(app)
+      .get('/api/admin/events')
+      .set(authHeader(adminToken));
+
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.data.events).toHaveLength(1);
+    expect(listRes.body.data.events[0].title).toBe('Admin Oversight Event');
+
+    const detailRes = await request(app)
+      .get(`/api/admin/events/${event._id}`)
+      .set(authHeader(adminToken));
+
+    expect(detailRes.status).toBe(200);
+    expect(detailRes.body.data.event.registrationsCount).toBe(1);
+    expect(detailRes.body.data.event.organizerId.name).toBe('Oversight Organizer');
+
+    const moderateRes = await request(app)
+      .patch(`/api/admin/events/${event._id}/status`)
+      .set(authHeader(adminToken))
+      .send({ status: 'cancelled', reason: 'Unsafe duplicate listing' });
+
+    expect(moderateRes.status).toBe(200);
+    expect(moderateRes.body.data.event.status).toBe('cancelled');
+
+    const announcementRes = await request(app)
+      .post('/api/admin/announcements')
+      .set(authHeader(adminToken))
+      .send({
+        title: 'Campus update',
+        message: 'This is an admin broadcast for all students.',
+        targetRole: 'student',
+      });
+
+    expect(announcementRes.status).toBe(201);
+    expect(announcementRes.body.data.recipientCount).toBeGreaterThanOrEqual(1);
+
+    const announcementNotification = await Notification.findOne({
+      userId: studentSignup.user.id,
+      type: 'admin_announcement',
+    });
+    expect(announcementNotification).toBeTruthy();
+    expect(announcementNotification.title).toBe('Campus update');
+  });
+
 });

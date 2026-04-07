@@ -10,6 +10,7 @@ const NOTIFICATION_TYPES = {
   EVENT_PUBLISHED: 'event_published',
   CERTIFICATE_READY: 'certificate_ready',
   ATTENDANCE_MARKED: 'attendance_marked',
+  ADMIN_ANNOUNCEMENT: 'admin_announcement',
 };
 
 const notificationSchema = new mongoose.Schema({
