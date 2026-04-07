@@ -30,6 +30,7 @@ type DashboardNavbarProps = {
 };
 
 type NavItem = {
+  key: string;
   label: string;
   href: string;
   icon: ReactNode;
@@ -37,18 +38,18 @@ type NavItem = {
 
 const roleLinks: Record<DashboardRole, NavItem[]> = {
   student: [
-    { label: 'Dashboard', href: '/dashboard/student', icon: <Home className="h-4 w-4" /> },
-    { label: 'Profile', href: '/dashboard/student/profile', icon: <UserCircle className="h-4 w-4" /> },
+    { key: 'student-dashboard', label: 'Dashboard', href: '/dashboard/student', icon: <Home className="h-4 w-4" /> },
+    { key: 'student-profile', label: 'Profile', href: '/dashboard/student/profile', icon: <UserCircle className="h-4 w-4" /> },
   ],
   organizer: [
-    { label: 'Dashboard', href: '/dashboard/organizer', icon: <Home className="h-4 w-4" /> },
-    { label: 'Analytics', href: '/dashboard/organizer/analytics', icon: <BarChart3 className="h-4 w-4" /> },
-    { label: 'Profile', href: '/dashboard/organizer/profile', icon: <UserCircle className="h-4 w-4" /> },
+    { key: 'organizer-dashboard', label: 'Dashboard', href: '/dashboard/organizer', icon: <Home className="h-4 w-4" /> },
+    { key: 'organizer-analytics', label: 'Analytics', href: '/dashboard/organizer/analytics', icon: <BarChart3 className="h-4 w-4" /> },
+    { key: 'organizer-profile', label: 'Profile', href: '/dashboard/organizer/profile', icon: <UserCircle className="h-4 w-4" /> },
   ],
   admin: [
-    { label: 'Dashboard', href: '/dashboard/admin', icon: <Home className="h-4 w-4" /> },
-    { label: 'Approvals', href: '/dashboard/admin', icon: <Users className="h-4 w-4" /> },
-    { label: 'Control', href: '/dashboard/admin', icon: <ShieldCheck className="h-4 w-4" /> },
+    { key: 'admin-dashboard', label: 'Dashboard', href: '/dashboard/admin', icon: <Home className="h-4 w-4" /> },
+    { key: 'admin-approvals', label: 'Approvals', href: '/dashboard/admin', icon: <Users className="h-4 w-4" /> },
+    { key: 'admin-control', label: 'Control', href: '/dashboard/admin', icon: <ShieldCheck className="h-4 w-4" /> },
   ],
 };
 
@@ -113,7 +114,7 @@ export function DashboardNavbar({
 
                   return (
                     <Link
-                      key={item.href}
+                      key={item.key}
                       href={item.href}
                       className={cn(
                         'inline-flex items-center gap-2 rounded-[0.95rem] px-3.5 py-2 text-sm font-medium transition-colors',

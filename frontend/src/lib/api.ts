@@ -1,5 +1,7 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import type {
+  AdminEventOversight,
+  AdminEventsPayload,
   AdminSummary,
   AdminUserReview,
   AdminUsersPayload,
@@ -197,6 +199,14 @@ export const usersAPI = {
 export const adminAPI = {
   getSummary: (): Promise<ApiResult<{ summary: AdminSummary }>> =>
     api.get('/admin/summary'),
+  getEvents: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<AdminEventsPayload>> =>
+    api.get('/admin/events', { params }),
+  getEvent: (eventId: string): Promise<ApiResult<{ event: AdminEventOversight }>> =>
+    api.get(`/admin/events/${eventId}`),
+  updateEventStatus: (eventId: string, data: { status: 'draft' | 'published' | 'cancelled'; reason?: string }): Promise<ApiResult<{ event: AdminEventOversight }>> =>
+    api.patch(`/admin/events/${eventId}/status`, data),
+  sendAnnouncement: (data: { title: string; message: string; targetRole?: 'all' | User['role']; department?: string; link?: string }): Promise<ApiResult<{ recipientCount: number }>> =>
+    api.post('/admin/announcements', data),
   getUsers: (params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedApiResult<AdminUsersPayload>> =>
     api.get('/admin/users', { params }),
   getUser: (userId: string): Promise<ApiResult<{ user: AdminUserReview }>> =>

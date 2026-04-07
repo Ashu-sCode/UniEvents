@@ -151,7 +151,8 @@ export type NotificationType =
   | 'event_cancelled'
   | 'event_published'
   | 'certificate_ready'
-  | 'attendance_marked';
+  | 'attendance_marked'
+  | 'admin_announcement';
 
 export interface Notification {
   _id: string;
@@ -253,6 +254,18 @@ export interface AdminSummary {
 
 export interface AdminUsersPayload {
   users: AdminUserReview[];
+}
+
+export interface AdminEventOversight extends Event {
+  attendanceCount: number;
+  certificateCount: number;
+  noShowCount: number;
+  registrations?: Ticket[];
+  registrationsCount?: number;
+}
+
+export interface AdminEventsPayload {
+  events: AdminEventOversight[];
 }
 
 export interface EventsPayload {
